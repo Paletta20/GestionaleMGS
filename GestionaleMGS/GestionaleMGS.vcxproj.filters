@@ -15,8 +15,91 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Cliente.cpp">
+      <Filter>File di origine</Filter>
+    </ClCompile>
+    <ClCompile Include="DatabaseManager.cpp">
+      <Filter>File di origine</Filter>
+    </ClCompile>
+    <ClCompile Include="Filato.cpp">
+      <Filter>File di origine</Filter>
+    </ClCompile>
+    <ClCompile Include="FinestraRecord.cpp">
+      <Filter>File di origine</Filter>
+    </ClCompile>
+    <ClCompile Include="Fornitore.cpp">
+      <Filter>File di origine</Filter>
+    </ClCompile>
+    <ClCompile Include="Menu.cpp">
+      <Filter>File di origine</Filter>
+    </ClCompile>
+    <ClCompile Include="Prodotto.cpp">
+      <Filter>File di origine</Filter>
+    </ClCompile>
+    <ClCompile Include="Tecnico.cpp">
+      <Filter>File di origine</Filter>
+    </ClCompile>
     <ClCompile Include="GestionaleMGS.cpp">
       <Filter>File di origine</Filter>
     </ClCompile>
+    <ClCompile Include="Immagine.cpp">
+      <Filter>File di origine</Filter>
+    </ClCompile>
+    <ClCompile Include="ConfigurazioneDatabase.cpp">
+      <Filter>File di origine</Filter>
+    </ClCompile>
+    <ClCompile Include="InterfacciaGrafica.cpp">
+      <Filter>File di origine</Filter>
+    </ClCompile>
+    <ClCompile Include="SchermataAvvio.cpp">
+      <Filter>File di origine</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Cliente.hpp">
+      <Filter>File di intestazione</Filter>
+    </ClInclude>
+    <ClInclude Include="DatabaseManager.hpp">
+      <Filter>File di intestazione</Filter>
+    </ClInclude>
+    <ClInclude Include="Filato.hpp">
+      <Filter>File di intestazione</Filter>
+    </ClInclude>
+    <ClInclude Include="FinestraRecord.hpp">
+      <Filter>File di intestazione</Filter>
+    </ClInclude>
+    <ClInclude Include="Fornitore.hpp">
+      <Filter>File di intestazione</Filter>
+    </ClInclude>
+    <ClInclude Include="Menu.hpp">
+      <Filter>File di intestazione</Filter>
+    </ClInclude>
+    <ClInclude Include="Prodotto.hpp">
+      <Filter>File di intestazione</Filter>
+    </ClInclude>
+    <ClInclude Include="Tecnico.hpp">
+      <Filter>File di intestazione</Filter>
+    </ClInclude>
+    <ClInclude Include="Immagine.hpp">
+      <Filter>File di intestazione</Filter>
+    </ClInclude>
+    <ClInclude Include="ConfigurazioneDatabase.hpp">
+      <Filter>File di intestazione</Filter>
+    </ClInclude>
+    <ClInclude Include="InterfacciaGrafica.hpp">
+      <Filter>File di intestazione</Filter>
+    </ClInclude>
+    <ClInclude Include="SchermataAvvio.hpp">
+      <Filter>File di intestazione</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Risorse\gran-sasso-intro-logo-preview.gif">
+      <Filter>File di risorse</Filter>
+    </None>
+    <None Include="Risorse\logo-gran-sasso.png">
+      <Filter>File di risorse</Filter>
+    </None>
   </ItemGroup>
 </Project>
+

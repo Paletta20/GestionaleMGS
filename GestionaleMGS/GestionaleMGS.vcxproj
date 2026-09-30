@@ -1,14 +1,6 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
-    <ProjectConfiguration Include="Debug|Win32">
-      <Configuration>Debug</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="Release|Win32">
-      <Configuration>Release</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
@@ -70,6 +62,10 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IncludePath>C:\Users\stef_\source\repos\GestionaleMGS\GestionaleMGS\mysql\include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Users\stef_\source\repos\GestionaleMGS\GestionaleMGS\mysql\lib64\vs14;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -108,17 +104,31 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;_ITERATOR_DEBUG_LEVEL=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>C:\Users\stef_\source\repos\GestionaleMGS\GestionaleMGS\mysql\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>C:\Users\stef_\source\repos\GestionaleMGS\GestionaleMGS\mysql\lib64\vs14\mysqlcppconn.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Users\stef_\source\repos\GestionaleMGS\GestionaleMGS\mysql\lib64\vs14;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <Manifest>
       <EnableSegmentHeap>true</EnableSegmentHeap>
     </Manifest>
+    <PostBuildEvent>
+      <Command>copy /Y "$(ProjectDir)mysql\lib64\mysqlcppconn-10-vs14.dll" "$(OutDir)"
+copy /Y "$(ProjectDir)mysql\lib64\libssl-3-x64.dll" "$(OutDir)"
+copy /Y "$(ProjectDir)mysql\lib64\libcrypto-3-x64.dll" "$(OutDir)"
+if exist "%APPDATA%\GestionaleMGS\database.conf" copy /Y "%APPDATA%\GestionaleMGS\database.conf" "$(OutDir)database.conf"
+if not exist "$(OutDir)Risorse" mkdir "$(OutDir)Risorse"
+copy /Y "$(ProjectDir)Risorse\gran-sasso-intro-logo-preview.gif" "$(OutDir)Risorse\"
+copy /Y "$(ProjectDir)Risorse\logo-gran-sasso.png" "$(OutDir)Risorse\"</Command>
+      <Message>Copying runtime files and startup animation</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -129,19 +139,62 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>C:\Users\stef_\source\repos\GestionaleMGS\GestionaleMGS\mysql\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>C:\Users\stef_\source\repos\GestionaleMGS\GestionaleMGS\mysql\lib64\vs14\mysqlcppconn.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Users\stef_\source\repos\GestionaleMGS\GestionaleMGS\mysql\lib64\vs14;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <Manifest>
       <EnableSegmentHeap>true</EnableSegmentHeap>
     </Manifest>
+    <PostBuildEvent>
+      <Command>copy /Y "$(ProjectDir)mysql\lib64\mysqlcppconn-10-vs14.dll" "$(OutDir)"
+copy /Y "$(ProjectDir)mysql\lib64\libssl-3-x64.dll" "$(OutDir)"
+copy /Y "$(ProjectDir)mysql\lib64\libcrypto-3-x64.dll" "$(OutDir)"
+if exist "%APPDATA%\GestionaleMGS\database.conf" copy /Y "%APPDATA%\GestionaleMGS\database.conf" "$(OutDir)database.conf"
+if not exist "$(OutDir)Risorse" mkdir "$(OutDir)Risorse"
+copy /Y "$(ProjectDir)Risorse\gran-sasso-intro-logo-preview.gif" "$(OutDir)Risorse\"
+copy /Y "$(ProjectDir)Risorse\logo-gran-sasso.png" "$(OutDir)Risorse\"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Cliente.cpp" />
+    <ClCompile Include="ConfigurazioneDatabase.cpp" />
+    <ClCompile Include="DatabaseManager.cpp" />
+    <ClCompile Include="Filato.cpp" />
+    <ClCompile Include="FinestraRecord.cpp" />
+    <ClCompile Include="Fornitore.cpp" />
     <ClCompile Include="GestionaleMGS.cpp" />
+    <ClCompile Include="Immagine.cpp" />
+    <ClCompile Include="InterfacciaGrafica.cpp" />
+    <ClCompile Include="Menu.cpp" />
+    <ClCompile Include="Prodotto.cpp" />
+    <ClCompile Include="SchermataAvvio.cpp" />
+    <ClCompile Include="Tecnico.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Cliente.hpp" />
+    <ClInclude Include="ConfigurazioneDatabase.hpp" />
+    <ClInclude Include="DatabaseManager.hpp" />
+    <ClInclude Include="Filato.hpp" />
+    <ClInclude Include="FinestraRecord.hpp" />
+    <ClInclude Include="Fornitore.hpp" />
+    <ClInclude Include="Immagine.hpp" />
+    <ClInclude Include="InterfacciaGrafica.hpp" />
+    <ClInclude Include="Menu.hpp" />
+    <ClInclude Include="Prodotto.hpp" />
+    <ClInclude Include="SchermataAvvio.hpp" />
+    <ClInclude Include="Tecnico.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Risorse\gran-sasso-intro-logo-preview.gif" />
+    <None Include="Risorse\logo-gran-sasso.png" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>
+

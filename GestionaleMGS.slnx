@@ -3,5 +3,5 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="GestionaleMGS/GestionaleMGS.vcxproj" />
+  <Project Path="GestionaleMGS/GestionaleMGS.vcxproj" Id="b345bdaa-80b6-494e-8160-df678401a490" />
 </Solution>
