@@ -1,3 +1,5 @@
+// Gestionale Maglificio Gran Sasso
+
 #include <Windows.h>
 
 #include <clocale>
