@@ -21,6 +21,8 @@ private:
 
     void menuTecnici();
 
+    void menuTrattamenti();
+
     int leggiScelta();
 
     void sceltoProdotti();
@@ -32,6 +34,8 @@ private:
     void sceltoFornitori();
 
     void sceltoTecnici();
+
+    void sceltoTrattamenti();
 
     void inserisciNewProdotto();
 
@@ -82,6 +86,16 @@ private:
     void eliminaTecnico();
 
     void stampaTecniciDaDatabase();
+
+    void inserisciNewTrattamento();
+
+    void cercaTrattamento();
+
+    void modificaTrattamento();
+
+    void eliminaTrattamento();
+
+    void stampaTrattamentiDaDatabase();
 
 public:
 

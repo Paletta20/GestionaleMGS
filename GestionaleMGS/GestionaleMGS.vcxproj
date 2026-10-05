@@ -123,7 +123,6 @@
       <Command>copy /Y "$(ProjectDir)mysql\lib64\mysqlcppconn-10-vs14.dll" "$(OutDir)"
 copy /Y "$(ProjectDir)mysql\lib64\libssl-3-x64.dll" "$(OutDir)"
 copy /Y "$(ProjectDir)mysql\lib64\libcrypto-3-x64.dll" "$(OutDir)"
-if exist "%APPDATA%\GestionaleMGS\database.conf" copy /Y "%APPDATA%\GestionaleMGS\database.conf" "$(OutDir)database.conf"
 if not exist "$(OutDir)Risorse" mkdir "$(OutDir)Risorse"
 copy /Y "$(ProjectDir)Risorse\gran-sasso-intro-logo-preview.gif" "$(OutDir)Risorse\"
 copy /Y "$(ProjectDir)Risorse\logo-gran-sasso.png" "$(OutDir)Risorse\"</Command>
@@ -154,7 +153,6 @@ copy /Y "$(ProjectDir)Risorse\logo-gran-sasso.png" "$(OutDir)Risorse\"</Command>
       <Command>copy /Y "$(ProjectDir)mysql\lib64\mysqlcppconn-10-vs14.dll" "$(OutDir)"
 copy /Y "$(ProjectDir)mysql\lib64\libssl-3-x64.dll" "$(OutDir)"
 copy /Y "$(ProjectDir)mysql\lib64\libcrypto-3-x64.dll" "$(OutDir)"
-if exist "%APPDATA%\GestionaleMGS\database.conf" copy /Y "%APPDATA%\GestionaleMGS\database.conf" "$(OutDir)database.conf"
 if not exist "$(OutDir)Risorse" mkdir "$(OutDir)Risorse"
 copy /Y "$(ProjectDir)Risorse\gran-sasso-intro-logo-preview.gif" "$(OutDir)Risorse\"
 copy /Y "$(ProjectDir)Risorse\logo-gran-sasso.png" "$(OutDir)Risorse\"</Command>
@@ -174,6 +172,7 @@ copy /Y "$(ProjectDir)Risorse\logo-gran-sasso.png" "$(OutDir)Risorse\"</Command>
     <ClCompile Include="Prodotto.cpp" />
     <ClCompile Include="SchermataAvvio.cpp" />
     <ClCompile Include="Tecnico.cpp" />
+    <ClCompile Include="Trattamento.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Cliente.hpp" />
@@ -188,6 +187,7 @@ copy /Y "$(ProjectDir)Risorse\logo-gran-sasso.png" "$(OutDir)Risorse\"</Command>
     <ClInclude Include="Prodotto.hpp" />
     <ClInclude Include="SchermataAvvio.hpp" />
     <ClInclude Include="Tecnico.hpp" />
+    <ClInclude Include="Trattamento.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Risorse\gran-sasso-intro-logo-preview.gif" />

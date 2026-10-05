@@ -226,6 +226,19 @@ namespace
         return nullptr;
     }
 
+    Trattamento* trovaTrattamentoPerDescrizione(
+        vector<Trattamento>& trattamenti,
+        const string& descrizione)
+    {
+        const string ricerca = normalizzaTesto(descrizione);
+        for (Trattamento& trattamento : trattamenti)
+        {
+            if (normalizzaTesto(trattamento.getTrattamento()) == ricerca)
+                return &trattamento;
+        }
+        return nullptr;
+    }
+
     Prodotto* trovaProdotto(vector<Prodotto>& prodotti, int articolo, int modello)
     {
         for (Prodotto& prodotto : prodotti)
@@ -390,6 +403,28 @@ void Menu::stampaTecniciDaDatabase()
     }
 }
 
+void Menu::stampaTrattamentiDaDatabase()
+{
+    vector<Trattamento> trattamenti = databaseManager->caricaTrattamenti();
+    if (!databaseManager->ultimoErrore().empty())
+    {
+        cout << "Errore lettura TRATTAMENTI da MySQL: "
+            << databaseManager->ultimoErrore() << endl;
+        return;
+    }
+    if (trattamenti.empty())
+    {
+        cout << "Il DataBase dei TRATTAMENTI in MySQL e' vuoto!" << endl;
+        return;
+    }
+    cout << "+---------- ELENCO TRATTAMENTI DA MYSQL ----------+" << endl;
+    for (Trattamento& trattamento : trattamenti)
+    {
+        trattamento.stampaRecordTrattamento();
+        cout << endl;
+    }
+}
+
 int Menu::leggiScelta()
 {
     int scelta;
@@ -411,6 +446,7 @@ void Menu::menuIniziale()
     cout << "| 3 - Lavora con DataBase Filati     |" << endl;
     cout << "| 4 - Lavora con DataBase Tecnici    |" << endl;
     cout << "| 5 - Lavora con DataBase Fornitori  |" << endl;
+    cout << "| 6 - Lavora con DataBase Trattamenti|" << endl;
     cout << "| 0 - Esci                           |" << endl;
     cout << "+------------------------------------+" << endl;
     cout << endl;
@@ -447,6 +483,10 @@ void Menu::avvia()
 
         case 5:
             sceltoFornitori();
+            break;
+
+        case 6:
+            sceltoTrattamenti();
             break;
 
         case 0:
@@ -535,6 +575,7 @@ void Menu::inserisciNewProdotto()
     vector<Filato> filati = databaseManager->caricaFilati();
     vector<Cliente> clienti = databaseManager->caricaClienti();
     vector<Tecnico> tecnici = databaseManager->caricaTecnici();
+    vector<Trattamento> trattamenti = databaseManager->caricaTrattamenti();
 
     if (!databaseManager->ultimoErrore().empty())
     {
@@ -619,7 +660,20 @@ void Menu::inserisciNewProdotto()
             cout << "Cognome e/o nome tecnico non esistente, inserire COGNOME e/o NOME del tecnico corretto!" << endl;
     } while (t == nullptr);
 
+    int sceltaTrattamento = -1;
+    do
+    {
+        cout << " ===== SCEGLI IL TRATTAMENTO ===== " << endl;
+        cout << "0 - Nessun trattamento" << endl;
+        for (size_t i = 0; i < trattamenti.size(); ++i)
+            cout << i + 1 << " - " << trattamenti[i].getTrattamento() << endl;
+        cout << "Scelta trattamento: ";
+        cin >> sceltaTrattamento;
+    } while (sceltaTrattamento < 0 || sceltaTrattamento > static_cast<int>(trattamenti.size()));
+
     Prodotto p = { stagione, anno, articolo, modello, descrizione, *f, *c, *t };
+    if (sceltaTrattamento > 0)
+        p.setTrattamento(trattamenti[sceltaTrattamento - 1]);
     if (!databaseManager->inserisciProdotto(p))
     {
         cout << "Errore inserimento prodotto su MySQL: "
@@ -703,6 +757,7 @@ void Menu::modificaProdotto() {
         cout << "6 - Filato" << endl;
         cout << "7 - Cliente" << endl;
         cout << "8 - Tecnico" << endl;
+        cout << "9 - Trattamento" << endl;
         cout << "0 - Fine modifica" << endl;
 
         scelta = leggiScelta();
@@ -848,6 +903,33 @@ void Menu::modificaProdotto() {
             } while (tecnico == nullptr);
 
             prodotto->setTecnico(*tecnico);
+            break;
+        }
+
+        case 9:
+        {
+            vector<Trattamento> trattamenti = databaseManager->caricaTrattamenti();
+            if (!databaseManager->ultimoErrore().empty())
+            {
+                cout << "Errore lettura TRATTAMENTI da MySQL: "
+                    << databaseManager->ultimoErrore() << endl;
+                break;
+            }
+
+            int selezione = -1;
+            do
+            {
+                cout << "0 - Nessun trattamento" << endl;
+                for (size_t i = 0; i < trattamenti.size(); ++i)
+                    cout << i + 1 << " - " << trattamenti[i].getTrattamento() << endl;
+                cout << "Nuovo trattamento: ";
+                selezione = leggiScelta();
+            } while (selezione < 0 || selezione > static_cast<int>(trattamenti.size()));
+
+            if (selezione == 0)
+                prodotto->setTrattamento(Trattamento());
+            else
+                prodotto->setTrattamento(trattamenti[selezione - 1]);
             break;
         }
 
@@ -2499,6 +2581,156 @@ void Menu::eliminaTecnico()
     }
 
     cout << "\nTecnico eliminato correttamente!" << endl;
+}
+
+// --------------------------------------------------------------------------------> TRATTAMENTI
+
+void Menu::menuTrattamenti()
+{
+    cout << endl;
+    cout << "+---------------------------------------------+" << endl;
+    cout << "|           - DATABASE TRATTAMENTI -          |" << endl;
+    cout << "+---------------------------------------------+" << endl;
+    cout << "| 1 - Cerca trattamento                       |" << endl;
+    cout << "| 2 - Crea nuovo trattamento                  |" << endl;
+    cout << "| 3 - Modifica trattamento                    |" << endl;
+    cout << "| 4 - Elimina trattamento                     |" << endl;
+    cout << "| 5 - Stampa database trattamenti completo    |" << endl;
+    cout << "| 0 - Indietro                                |" << endl;
+    cout << "+---------------------------------------------+" << endl;
+}
+
+void Menu::sceltoTrattamenti()
+{
+    int scelta = 0;
+    do
+    {
+        menuTrattamenti();
+        scelta = leggiScelta();
+        switch (scelta)
+        {
+        case 1: cercaTrattamento(); break;
+        case 2: inserisciNewTrattamento(); break;
+        case 3: modificaTrattamento(); break;
+        case 4: eliminaTrattamento(); break;
+        case 5: stampaTrattamentiDaDatabase(); break;
+        case 0: break;
+        default: cout << "Scelta non valida." << endl; break;
+        }
+    } while (scelta != 0);
+}
+
+void Menu::inserisciNewTrattamento()
+{
+    string descrizione;
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    cout << "Trattamento: ";
+    getline(cin, descrizione);
+    if (descrizione.empty())
+    {
+        cout << "Il trattamento non puo' essere vuoto." << endl;
+        return;
+    }
+    if (!databaseManager->inserisciTrattamento(Trattamento(descrizione)))
+    {
+        cout << "Errore inserimento trattamento su MySQL: "
+            << databaseManager->ultimoErrore() << endl;
+        return;
+    }
+    cout << "Trattamento aggiunto correttamente." << endl;
+}
+
+void Menu::cercaTrattamento()
+{
+    vector<Trattamento> trattamenti = databaseManager->caricaTrattamenti();
+    if (!databaseManager->ultimoErrore().empty())
+    {
+        cout << "Errore lettura TRATTAMENTI da MySQL: "
+            << databaseManager->ultimoErrore() << endl;
+        return;
+    }
+
+    string ricerca;
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    cout << "Testo da cercare nel trattamento: ";
+    getline(cin, ricerca);
+    const string normalizzata = normalizzaTesto(ricerca);
+    bool trovato = false;
+    for (Trattamento& trattamento : trattamenti)
+    {
+        if (normalizzaTesto(trattamento.getTrattamento()).find(normalizzata) != string::npos)
+        {
+            trattamento.stampaRecordTrattamento();
+            cout << endl;
+            trovato = true;
+        }
+    }
+    if (!trovato) cout << "Nessun trattamento trovato." << endl;
+}
+
+void Menu::modificaTrattamento()
+{
+    vector<Trattamento> trattamenti = databaseManager->caricaTrattamenti();
+    string descrizione;
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    cout << "Trattamento da modificare: ";
+    getline(cin, descrizione);
+    Trattamento* trattamento = trovaTrattamentoPerDescrizione(trattamenti, descrizione);
+    if (trattamento == nullptr)
+    {
+        cout << "Trattamento non trovato." << endl;
+        return;
+    }
+
+    string nuovaDescrizione;
+    cout << "Nuovo trattamento: ";
+    getline(cin, nuovaDescrizione);
+    if (nuovaDescrizione.empty())
+    {
+        cout << "Il trattamento non puo' essere vuoto." << endl;
+        return;
+    }
+    if (!databaseManager->aggiornaTrattamento(
+        trattamento->getId_Trattamento(), Trattamento(nuovaDescrizione)))
+    {
+        cout << "Errore modifica trattamento su MySQL: "
+            << databaseManager->ultimoErrore() << endl;
+        return;
+    }
+    cout << "Trattamento modificato correttamente." << endl;
+}
+
+void Menu::eliminaTrattamento()
+{
+    vector<Trattamento> trattamenti = databaseManager->caricaTrattamenti();
+    string descrizione;
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    cout << "Trattamento da eliminare: ";
+    getline(cin, descrizione);
+    Trattamento* trattamento = trovaTrattamentoPerDescrizione(trattamenti, descrizione);
+    if (trattamento == nullptr)
+    {
+        cout << "Trattamento non trovato." << endl;
+        return;
+    }
+
+    string conferma;
+    cout << "Confermi l'eliminazione? I prodotti collegati resteranno senza trattamento (SI/NO): ";
+    getline(cin, conferma);
+    for (char& carattere : conferma)
+        carattere = static_cast<char>(toupper(static_cast<unsigned char>(carattere)));
+    if (conferma != "SI")
+    {
+        cout << "Operazione annullata." << endl;
+        return;
+    }
+    if (!databaseManager->eliminaTrattamento(trattamento->getId_Trattamento()))
+    {
+        cout << "Errore eliminazione trattamento su MySQL: "
+            << databaseManager->ultimoErrore() << endl;
+        return;
+    }
+    cout << "Trattamento eliminato correttamente." << endl;
 }
 
 

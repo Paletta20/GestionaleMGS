@@ -119,8 +119,9 @@ bool DatabaseManager::verificaSchema(std::vector<std::string>& problemi)
         { "filati", { "id_filato", "codice", "nome", "composizione", "titolo", "id_fornitore", "attivo" } },
         { "clienti", { "id_cliente", "nome", "serie", "attivo" } },
         { "tecnici", { "id_tecnico", "cognome", "nome", "attivo" } },
+        { "trattamenti", { "id_trattamento", "trattamento" } },
         { "stagioni", { "id_stagione", "codice" } },
-        { "prodotti", { "id_prodotto", "articolo", "modello", "anno", "descrizione", "id_filato", "id_cliente", "id_tecnico", "id_stagione", "id_immagine" } },
+        { "prodotti", { "id_prodotto", "articolo", "modello", "anno", "descrizione", "id_filato", "id_cliente", "id_tecnico", "id_stagione", "id_trattamento", "id_immagine" } },
         { "immagini", { "id_immagine", "id_prodotto", "percorso_file", "descrizione", "data_caricamento", "nome_file", "mime_type", "dati_immagine" } }
     };
 
@@ -210,6 +211,56 @@ bool DatabaseManager::preparaArchivioImmagini()
             "CASE WHEN i.nome_file IS NOT NULL AND INSTR(i.nome_file, '.') > 0 "
             "THEN CONCAT('.', LOWER(SUBSTRING_INDEX(i.nome_file, '.', -1))) ELSE '' END) "
             "WHERE i.dati_immagine IS NOT NULL");
+        return true;
+    }
+    catch (const sql::SQLException& err)
+    {
+        std::ostringstream messaggio;
+        messaggio << err.what() << " (codice: " << err.getErrorCode()
+            << ", stato SQL: " << err.getSQLState() << ")";
+        ultimo_errore = messaggio.str();
+        return false;
+    }
+}
+
+bool DatabaseManager::preparaArchivioTrattamenti()
+{
+    ultimo_errore.clear();
+    if (!isConnesso())
+    {
+        ultimo_errore = "Connessione DataBase non attiva.";
+        return false;
+    }
+
+    try
+    {
+        std::unique_ptr<sql::Statement> statement(connection->createStatement());
+        statement->execute(
+            "CREATE TABLE IF NOT EXISTS trattamenti ("
+            "id_trattamento INT NOT NULL AUTO_INCREMENT, "
+            "trattamento VARCHAR(255) NOT NULL, "
+            "PRIMARY KEY (id_trattamento), "
+            "UNIQUE KEY uq_trattamenti_trattamento (trattamento)"
+            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        std::unique_ptr<sql::ResultSet> colonna(statement->executeQuery(
+            "SELECT COUNT(*) AS presente FROM INFORMATION_SCHEMA.COLUMNS "
+            "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'prodotti' "
+            "AND COLUMN_NAME = 'id_trattamento'"));
+        if (!colonna->next() || colonna->getInt("presente") == 0)
+            statement->execute("ALTER TABLE prodotti ADD COLUMN id_trattamento INT NULL AFTER id_stagione");
+
+        std::unique_ptr<sql::ResultSet> vincolo(statement->executeQuery(
+            "SELECT COUNT(*) AS presente FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS "
+            "WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'prodotti' "
+            "AND CONSTRAINT_NAME = 'fk_prodotti_trattamenti' AND CONSTRAINT_TYPE = 'FOREIGN KEY'"));
+        if (!vincolo->next() || vincolo->getInt("presente") == 0)
+        {
+            statement->execute(
+                "ALTER TABLE prodotti ADD CONSTRAINT fk_prodotti_trattamenti "
+                "FOREIGN KEY (id_trattamento) REFERENCES trattamenti(id_trattamento) "
+                "ON DELETE SET NULL ON UPDATE CASCADE");
+        }
         return true;
     }
     catch (const sql::SQLException& err)
@@ -417,6 +468,22 @@ std::vector<Tecnico> DatabaseManager::caricaTecnici()
     return tecnici;
 }
 
+std::vector<Trattamento> DatabaseManager::caricaTrattamenti()
+{
+    std::vector<Trattamento> trattamenti;
+    std::unique_ptr<sql::ResultSet> result = eseguiSelect(
+        "SELECT id_trattamento, trattamento FROM trattamenti ORDER BY id_trattamento");
+    if (result == nullptr) return trattamenti;
+
+    while (result->next())
+    {
+        trattamenti.emplace_back(
+            result->getInt("id_trattamento"),
+            result->getString("trattamento"));
+    }
+    return trattamenti;
+}
+
 std::vector<Prodotto> DatabaseManager::caricaProdotti()
 {
     std::vector<Prodotto> prodotti;
@@ -432,12 +499,14 @@ std::vector<Prodotto> DatabaseManager::caricaProdotti()
             "fi.titolo AS titolo_filato, fo.nome AS nome_fornitore, "
             "c.id_cliente, c.nome AS nome_cliente, c.serie AS serie_cliente, "
             "t.id_tecnico, t.cognome AS tecnico_cognome, t.nome AS tecnico_nome "
+            ", tr.id_trattamento, tr.trattamento "
             "FROM prodotti p "
             "INNER JOIN stagioni s ON s.id_stagione = p.id_stagione "
             "INNER JOIN filati fi ON fi.id_filato = p.id_filato "
             "LEFT JOIN fornitori fo ON fo.id_fornitore = fi.id_fornitore "
             "INNER JOIN clienti c ON c.id_cliente = p.id_cliente "
             "INNER JOIN tecnici t ON t.id_tecnico = p.id_tecnico "
+            "LEFT JOIN trattamenti tr ON tr.id_trattamento = p.id_trattamento "
             "LEFT JOIN immagini i ON i.id_immagine = p.id_immagine "
             "ORDER BY p.id_prodotto");
 
@@ -483,6 +552,12 @@ std::vector<Prodotto> DatabaseManager::caricaProdotti()
             filato,
             cliente,
             tecnico);
+        if (!result->isNull("id_trattamento"))
+        {
+            prodotti.back().setTrattamento(Trattamento(
+                result->getInt("id_trattamento"),
+                result->getString("trattamento")));
+        }
     }
 
     return prodotti;
@@ -887,6 +962,89 @@ bool DatabaseManager::eliminaTecnico(const std::string& cognome, const std::stri
     }
 }
 
+bool DatabaseManager::inserisciTrattamento(const Trattamento& trattamento)
+{
+    ultimo_errore.clear();
+    if (!isConnesso())
+    {
+        ultimo_errore = "Connessione DataBase non attiva.";
+        return false;
+    }
+
+    try
+    {
+        std::unique_ptr<sql::PreparedStatement> statement(
+            connection->prepareStatement(
+                "INSERT INTO trattamenti (trattamento) VALUES (?)"));
+        statement->setString(1, trattamento.getTrattamento());
+        statement->executeUpdate();
+        return true;
+    }
+    catch (const sql::SQLException& err)
+    {
+        std::ostringstream messaggio;
+        messaggio << err.what() << " (codice: " << err.getErrorCode()
+            << ", stato SQL: " << err.getSQLState() << ")";
+        ultimo_errore = messaggio.str();
+        return false;
+    }
+}
+
+bool DatabaseManager::aggiornaTrattamento(int idTrattamento, const Trattamento& trattamento)
+{
+    ultimo_errore.clear();
+    if (!isConnesso())
+    {
+        ultimo_errore = "Connessione DataBase non attiva.";
+        return false;
+    }
+
+    try
+    {
+        std::unique_ptr<sql::PreparedStatement> statement(
+            connection->prepareStatement(
+                "UPDATE trattamenti SET trattamento = ? WHERE id_trattamento = ?"));
+        statement->setString(1, trattamento.getTrattamento());
+        statement->setInt(2, idTrattamento);
+        return statement->executeUpdate() > 0;
+    }
+    catch (const sql::SQLException& err)
+    {
+        std::ostringstream messaggio;
+        messaggio << err.what() << " (codice: " << err.getErrorCode()
+            << ", stato SQL: " << err.getSQLState() << ")";
+        ultimo_errore = messaggio.str();
+        return false;
+    }
+}
+
+bool DatabaseManager::eliminaTrattamento(int idTrattamento)
+{
+    ultimo_errore.clear();
+    if (!isConnesso())
+    {
+        ultimo_errore = "Connessione DataBase non attiva.";
+        return false;
+    }
+
+    try
+    {
+        std::unique_ptr<sql::PreparedStatement> statement(
+            connection->prepareStatement(
+                "DELETE FROM trattamenti WHERE id_trattamento = ?"));
+        statement->setInt(1, idTrattamento);
+        return statement->executeUpdate() > 0;
+    }
+    catch (const sql::SQLException& err)
+    {
+        std::ostringstream messaggio;
+        messaggio << err.what() << " (codice: " << err.getErrorCode()
+            << ", stato SQL: " << err.getSQLState() << ")";
+        ultimo_errore = messaggio.str();
+        return false;
+    }
+}
+
 bool DatabaseManager::inserisciProdotto(const Prodotto& prodotto)
 {
     ultimo_errore.clear();
@@ -934,8 +1092,8 @@ bool DatabaseManager::inserisciProdotto(const Prodotto& prodotto)
         std::unique_ptr<sql::PreparedStatement> statement(
             connection->prepareStatement(
                 "INSERT INTO prodotti "
-                "(articolo, modello, anno, descrizione, id_filato, id_cliente, id_tecnico, id_stagione, id_immagine) "
-                "SELECT ?, ?, ?, ?, fi.id_filato, c.id_cliente, t.id_tecnico, s.id_stagione, ? "
+                "(articolo, modello, anno, descrizione, id_filato, id_cliente, id_tecnico, id_stagione, id_trattamento, id_immagine) "
+                "SELECT ?, ?, ?, ?, fi.id_filato, c.id_cliente, t.id_tecnico, s.id_stagione, NULLIF(?, 0), ? "
                 "FROM filati fi "
                 "INNER JOIN clienti c ON c.serie = ? AND c.attivo = 1 "
                 "INNER JOIN tecnici t ON t.cognome = ? AND t.nome = ? AND t.attivo = 1 "
@@ -945,12 +1103,13 @@ bool DatabaseManager::inserisciProdotto(const Prodotto& prodotto)
         statement->setInt(2, prodotto.getModello());
         statement->setInt(3, prodotto.getAnno());
         statement->setString(4, prodotto.getDescrizione());
-        statement->setInt(5, idImmagine);
-        statement->setInt(6, prodotto.getCliente().getSerie());
-        statement->setString(7, prodotto.getTecnico().getCognome());
-        statement->setString(8, prodotto.getTecnico().getNome());
-        statement->setString(9, shortToCodiceStagione(prodotto.getStagione()));
-        statement->setInt(10, prodotto.getFilato().getCodice());
+        statement->setInt(5, prodotto.getTrattamento().getId_Trattamento());
+        statement->setInt(6, idImmagine);
+        statement->setInt(7, prodotto.getCliente().getSerie());
+        statement->setString(8, prodotto.getTecnico().getCognome());
+        statement->setString(9, prodotto.getTecnico().getNome());
+        statement->setString(10, shortToCodiceStagione(prodotto.getStagione()));
+        statement->setInt(11, prodotto.getFilato().getCodice());
 
         if (statement->executeUpdate() == 0)
         {
@@ -1036,7 +1195,7 @@ bool DatabaseManager::aggiornaProdotto(int vecchioArticolo, int vecchioModello, 
                 "SET p.articolo = ?, p.modello = ?, p.anno = ?, p.descrizione = ?, "
                 "p.id_filato = fi.id_filato, p.id_cliente = c.id_cliente, "
                 "p.id_tecnico = t.id_tecnico, p.id_stagione = s.id_stagione, "
-                "i.percorso_file = ?, i.descrizione = ? "
+                "p.id_trattamento = NULLIF(?, 0), i.percorso_file = ?, i.descrizione = ? "
                 "WHERE p.articolo = ? AND p.modello = ?"));
         statement->setInt(1, prodotto.getFilato().getCodice());
         statement->setInt(2, prodotto.getCliente().getSerie());
@@ -1047,10 +1206,11 @@ bool DatabaseManager::aggiornaProdotto(int vecchioArticolo, int vecchioModello, 
         statement->setInt(7, prodotto.getModello());
         statement->setInt(8, prodotto.getAnno());
         statement->setString(9, prodotto.getDescrizione());
-        statement->setString(10, prodotto.getImmagine().getPercorsoFile());
-        statement->setString(11, prodotto.getImmagine().getDescrizione());
-        statement->setInt(12, vecchioArticolo);
-        statement->setInt(13, vecchioModello);
+        statement->setInt(10, prodotto.getTrattamento().getId_Trattamento());
+        statement->setString(11, prodotto.getImmagine().getPercorsoFile());
+        statement->setString(12, prodotto.getImmagine().getDescrizione());
+        statement->setInt(13, vecchioArticolo);
+        statement->setInt(14, vecchioModello);
         return statement->executeUpdate() > 0;
     }
     catch (const sql::SQLException& err)

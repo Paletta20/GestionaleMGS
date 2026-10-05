@@ -65,6 +65,14 @@ int main(int argc, char* argv[])
         return 1;
     }
 
+    if (!mysql.preparaArchivioTrattamenti())
+    {
+        const std::string errore = "Preparazione archivio trattamenti non riuscita: " + mysql.ultimoErrore();
+        std::cerr << errore << std::endl;
+        MessageBoxA(nullptr, errore.c_str(), "Gestionale MGS", MB_OK | MB_ICONERROR);
+        return 1;
+    }
+
     if (modalitaVerifica)
     {
         std::vector<std::string> problemi;
@@ -73,6 +81,7 @@ int main(int argc, char* argv[])
         mysql.caricaFilati(); const std::string erroreFilati = mysql.ultimoErrore();
         mysql.caricaFornitori(); const std::string erroreFornitori = mysql.ultimoErrore();
         mysql.caricaTecnici(); const std::string erroreTecnici = mysql.ultimoErrore();
+        mysql.caricaTrattamenti(); const std::string erroreTrattamenti = mysql.ultimoErrore();
         const std::vector<Prodotto> prodotti = mysql.caricaProdotti();
         const std::string erroreProdotti = mysql.ultimoErrore();
 
@@ -80,6 +89,7 @@ int main(int argc, char* argv[])
         if (!erroreFilati.empty()) problemi.push_back("Caricamento filati: " + erroreFilati);
         if (!erroreFornitori.empty()) problemi.push_back("Caricamento fornitori: " + erroreFornitori);
         if (!erroreTecnici.empty()) problemi.push_back("Caricamento tecnici: " + erroreTecnici);
+        if (!erroreTrattamenti.empty()) problemi.push_back("Caricamento trattamenti: " + erroreTrattamenti);
         if (!erroreProdotti.empty()) problemi.push_back("Caricamento prodotti: " + erroreProdotti);
         for (const Prodotto& prodotto : prodotti)
         {

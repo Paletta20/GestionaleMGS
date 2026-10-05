@@ -361,3 +361,8 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Database credentials and local distribution artifacts
+database.conf
+Distribuzione/
+*.zip

@@ -39,6 +39,9 @@
     <ClCompile Include="Tecnico.cpp">
       <Filter>File di origine</Filter>
     </ClCompile>
+    <ClCompile Include="Trattamento.cpp">
+      <Filter>File di origine</Filter>
+    </ClCompile>
     <ClCompile Include="GestionaleMGS.cpp">
       <Filter>File di origine</Filter>
     </ClCompile>
@@ -78,6 +81,9 @@
       <Filter>File di intestazione</Filter>
     </ClInclude>
     <ClInclude Include="Tecnico.hpp">
+      <Filter>File di intestazione</Filter>
+    </ClInclude>
+    <ClInclude Include="Trattamento.hpp">
       <Filter>File di intestazione</Filter>
     </ClInclude>
     <ClInclude Include="Immagine.hpp">

@@ -15,7 +15,7 @@ namespace Gdiplus
 class InterfacciaGrafica
 {
 private:
-    enum class Sezione { Prodotti, Clienti, Filati, Tecnici, Fornitori };
+    enum class Sezione { Prodotti, Clienti, Filati, Tecnici, Fornitori, Trattamenti };
 
     DatabaseManager* databaseManager;
     Sezione sezioneCorrente;
@@ -31,6 +31,7 @@ private:
     HWND pulsanteCaricaImmagine;
     HWND logo;
     HWND pannelloImmagine;
+    HWND riepilogoProdotto;
     HFONT fontInterfaccia;
     HFONT fontTitolo;
     ULONG_PTR gdiplusToken;
@@ -45,6 +46,7 @@ private:
     std::vector<Filato> filati;
     std::vector<Fornitore> fornitori;
     std::vector<Tecnico> tecnici;
+    std::vector<Trattamento> trattamenti;
     std::vector<Prodotto> prodotti;
 
     static LRESULT CALLBACK proceduraFinestra(HWND hwnd, UINT messaggio, WPARAM wParam, LPARAM lParam);
@@ -58,8 +60,10 @@ private:
     void mostraFilati(bool ricarica = true);
     void mostraFornitori(bool ricarica = true);
     void mostraTecnici(bool ricarica = true);
+    void mostraTrattamenti(bool ricarica = true);
     void mostraProdotti(bool ricarica = true);
     void aggiornaImmagineProdotto();
+    void aggiornaRiepilogoProdotto();
     void caricaImmagineSelezionata();
     void pulisciImmagineProdotto();
     void disegnaLogo(const DRAWITEMSTRUCT& disegno);

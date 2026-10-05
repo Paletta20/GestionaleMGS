@@ -1,0 +1,6 @@
+# Copiare questo file in database.conf e sostituire i segnaposto.
+# Non pubblicare mai il file compilato con credenziali reali.
+host=tcp://HOST_AIVEN:PORTA
+utente=UTENTE_DEMO
+password=PASSWORD_DEMO
+database=gestionale_db

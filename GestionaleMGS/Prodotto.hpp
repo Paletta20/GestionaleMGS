@@ -13,6 +13,7 @@
 #include "Cliente.hpp"
 #include "Tecnico.hpp"
 #include "Immagine.hpp"
+#include "Trattamento.hpp"
 
 using namespace std;
 
@@ -29,6 +30,7 @@ private:
     Filato filato;
     Cliente cliente;
     Tecnico tecnico;
+    Trattamento trattamento;
 
     static string generaPathImmagine(int articolo, int modello);
     void aggiornaPathImmagineAutomatico();
@@ -134,6 +136,8 @@ public:
 
     const Tecnico& getTecnico() const;
 
+    const Trattamento& getTrattamento() const;
+
     //Metodi Set
 
     void setStagione(short newStagione);
@@ -155,6 +159,8 @@ public:
     void setCliente(const Cliente& nuovoCliente);
 
     void setTecnico(const Tecnico& nuovoTecnico);
+
+    void setTrattamento(const Trattamento& nuovoTrattamento);
 
     //Metodi Stampa
 

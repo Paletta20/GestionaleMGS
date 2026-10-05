@@ -21,6 +21,7 @@ namespace
     constexpr int ID_FILATI = 1003;
     constexpr int ID_TECNICI = 1004;
     constexpr int ID_FORNITORI = 1005;
+    constexpr int ID_TRATTAMENTI = 1006;
     constexpr int ID_RICERCA = 1010;
     constexpr int ID_NUOVO = 1011;
     constexpr int ID_MODIFICA = 1012;
@@ -107,7 +108,7 @@ InterfacciaGrafica::InterfacciaGrafica(DatabaseManager& dbManager)
     : databaseManager(&dbManager), sezioneCorrente(Sezione::Prodotti), finestra(nullptr), elenco(nullptr),
     titolo(nullptr), stato(nullptr), ricerca(nullptr), pulsanteNuovo(nullptr), pulsanteModifica(nullptr),
     pulsanteElimina(nullptr), pulsanteAggiorna(nullptr), pulsanteCaricaImmagine(nullptr), logo(nullptr),
-    pannelloImmagine(nullptr), fontInterfaccia(nullptr), fontTitolo(nullptr), gdiplusToken(0),
+    pannelloImmagine(nullptr), riepilogoProdotto(nullptr), fontInterfaccia(nullptr), fontTitolo(nullptr), gdiplusToken(0),
     logoAzienda(nullptr), immagineVisualizzata(nullptr),
     flussoImmagine(nullptr), messaggioImmagine(L"Immagine non presente nel database."),
     lenteAttiva(false), posizioneLente{ 0, 0 }
@@ -278,6 +279,7 @@ LRESULT InterfacciaGrafica::gestisciMessaggio(UINT messaggio, WPARAM wParam, LPA
         case ID_FILATI: sezioneCorrente = Sezione::Filati; SetWindowTextW(ricerca, L""); mostraFilati(); break;
         case ID_TECNICI: sezioneCorrente = Sezione::Tecnici; SetWindowTextW(ricerca, L""); mostraTecnici(); break;
         case ID_FORNITORI: sezioneCorrente = Sezione::Fornitori; SetWindowTextW(ricerca, L""); mostraFornitori(); break;
+        case ID_TRATTAMENTI: sezioneCorrente = Sezione::Trattamenti; SetWindowTextW(ricerca, L""); mostraTrattamenti(); break;
         case ID_NUOVO: nuovoRecord(); break;
         case ID_MODIFICA: modificaRecord(); break;
         case ID_ELIMINA: eliminaRecord(); break;
@@ -302,9 +304,9 @@ void InterfacciaGrafica::creaControlli()
         DEFAULT_PITCH, L"Segoe UI");
     logo = CreateWindowExW(0, L"STATIC", L"", WS_CHILD | WS_VISIBLE | SS_OWNERDRAW,
         18, 12, 170, 72, finestra, reinterpret_cast<HMENU>(static_cast<INT_PTR>(ID_LOGO)), nullptr, nullptr);
-    const wchar_t* etichette[] = { L"Prodotti", L"Clienti", L"Filati", L"Tecnici", L"Fornitori" };
-    const int id[] = { ID_PRODOTTI, ID_CLIENTI, ID_FILATI, ID_TECNICI, ID_FORNITORI };
-    for (int i = 0; i < 5; ++i)
+    const wchar_t* etichette[] = { L"Prodotti", L"Clienti", L"Filati", L"Tecnici", L"Fornitori", L"Trattamenti" };
+    const int id[] = { ID_PRODOTTI, ID_CLIENTI, ID_FILATI, ID_TECNICI, ID_FORNITORI, ID_TRATTAMENTI };
+    for (int i = 0; i < 6; ++i)
     {
         HWND pulsante = CreateWindowExW(0, L"BUTTON", etichette[i], WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
             18, 107 + i * 50, 170, 38, finestra, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id[i])), nullptr, nullptr);
@@ -340,6 +342,10 @@ void InterfacciaGrafica::creaControlli()
     pannelloImmagine = CreateWindowExW(0, L"STATIC", L"", WS_CHILD | WS_VISIBLE | SS_OWNERDRAW | SS_NOTIFY,
         900, 105, 290, 420, finestra, reinterpret_cast<HMENU>(static_cast<INT_PTR>(ID_PANNELLO_IMMAGINE)), nullptr, nullptr);
     SetWindowSubclass(pannelloImmagine, proceduraPannelloImmagine, 1, reinterpret_cast<DWORD_PTR>(this));
+    riepilogoProdotto = CreateWindowExW(WS_EX_CLIENTEDGE, L"STATIC", L"Selezionare un prodotto.",
+        WS_CHILD | WS_VISIBLE | SS_LEFT | SS_NOPREFIX,
+        900, 537, 290, 120, finestra, nullptr, nullptr, nullptr);
+    applicaFont(riepilogoProdotto, fontInterfaccia);
     stato = CreateWindowExW(0, L"STATIC", L"Connesso", WS_CHILD | WS_VISIBLE,
         18, 690, 1150, 28, finestra, nullptr, nullptr, nullptr);
     applicaFont(stato, fontInterfaccia);
@@ -350,13 +356,21 @@ void InterfacciaGrafica::ridimensiona(int larghezza, int altezza)
     if (elenco == nullptr) return;
     const bool mostraImmagine = sezioneCorrente == Sezione::Prodotti;
     const int larghezzaPannello = 450;
+    const int altezzaRiepilogo = 120;
+    const int spazioVerticale = 12;
     const int spazioPannello = mostraImmagine ? larghezzaPannello + 14 : 0;
     const int larghezzaElenco = larghezza - 242 - spazioPannello > 300 ? larghezza - 242 - spazioPannello : 300;
     const int altezzaElenco = altezza - 160 > 180 ? altezza - 160 : 180;
+    const int altezzaImmagine = altezzaElenco - altezzaRiepilogo - spazioVerticale > 180
+        ? altezzaElenco - altezzaRiepilogo - spazioVerticale : 180;
+    const int xPannello = 220 + larghezzaElenco + 14;
     MoveWindow(elenco, 220, 105, larghezzaElenco, altezzaElenco, TRUE);
-    MoveWindow(pannelloImmagine, 220 + larghezzaElenco + 14, 105, larghezzaPannello, altezzaElenco, TRUE);
+    MoveWindow(pannelloImmagine, xPannello, 105, larghezzaPannello, altezzaImmagine, TRUE);
+    MoveWindow(riepilogoProdotto, xPannello, 105 + altezzaImmagine + spazioVerticale,
+        larghezzaPannello, altezzaRiepilogo, TRUE);
     MoveWindow(titolo, 220, 12, larghezza - 238 > 300 ? larghezza - 238 : 300, 40, TRUE);
     ShowWindow(pannelloImmagine, mostraImmagine ? SW_SHOW : SW_HIDE);
+    ShowWindow(riepilogoProdotto, mostraImmagine ? SW_SHOW : SW_HIDE);
     ShowWindow(pulsanteCaricaImmagine, mostraImmagine ? SW_SHOW : SW_HIDE);
     MoveWindow(stato, 18, altezza - 42, larghezza - 36, 26, TRUE);
 }
@@ -484,13 +498,29 @@ void InterfacciaGrafica::mostraTecnici(bool ricarica)
     aggiornaStato(visibili, tecnici.size());
 }
 
+void InterfacciaGrafica::mostraTrattamenti(bool ricarica)
+{
+    sezioneCorrente = Sezione::Trattamenti;
+    if (ricarica) trattamenti = databaseManager->caricaTrattamenti();
+    const wchar_t* colonne[] = { L"Trattamento" };
+    const int larghezze[] = { 760 };
+    preparaElenco(L"Trattamenti", colonne, larghezze, 1);
+    std::size_t visibili = 0;
+    for (int i = 0; i < static_cast<int>(trattamenti.size()); ++i)
+    {
+        const auto valori = std::vector<std::wstring>{ utf8ToWide(trattamenti[i].getTrattamento()) };
+        if (corrispondeAllaRicerca(valori)) { aggiungiRiga(valori, i); ++visibili; }
+    }
+    aggiornaStato(visibili, trattamenti.size());
+}
+
 void InterfacciaGrafica::mostraProdotti(bool ricarica)
 {
     sezioneCorrente = Sezione::Prodotti;
     if (ricarica) prodotti = databaseManager->caricaProdotti();
-    const wchar_t* colonne[] = { L"Articolo", L"Modello", L"Anno", L"Stagione", L"Descrizione", L"Cliente", L"Filato", L"Tecnico" };
-    const int larghezze[] = { 90, 90, 80, 90, 250, 160, 160, 180 };
-    preparaElenco(L"Prodotti", colonne, larghezze, 8);
+    const wchar_t* colonne[] = { L"Articolo", L"Modello", L"Anno", L"Stagione", L"Descrizione", L"Cliente", L"Filato", L"Tecnico", L"Trattamento" };
+    const int larghezze[] = { 90, 90, 80, 90, 250, 160, 160, 180, 300 };
+    preparaElenco(L"Prodotti", colonne, larghezze, 9);
     std::size_t visibili = 0;
     for (int i = 0; i < static_cast<int>(prodotti.size()); ++i)
     {
@@ -498,7 +528,8 @@ void InterfacciaGrafica::mostraProdotti(bool ricarica)
         const auto valori = std::vector<std::wstring>{ std::to_wstring(d.getArticolo()), std::to_wstring(d.getModello()),
             std::to_wstring(d.getAnno()), d.getStagione() == 1 ? L"PE" : L"AI", utf8ToWide(d.getDescrizione()),
             utf8ToWide(d.getCliente().getNome()), utf8ToWide(d.getFilato().getNome()),
-            utf8ToWide(d.getTecnico().getCognome() + " " + d.getTecnico().getNome()) };
+            utf8ToWide(d.getTecnico().getCognome() + " " + d.getTecnico().getNome()),
+            d.getTrattamento().isAssegnato() ? utf8ToWide(d.getTrattamento().getTrattamento()) : L"Nessun trattamento" };
         if (corrispondeAllaRicerca(valori)) { aggiungiRiga(valori, i); ++visibili; }
     }
     aggiornaStato(visibili, prodotti.size());
@@ -521,6 +552,7 @@ void InterfacciaGrafica::aggiornaImmagineProdotto()
 {
     pulisciImmagineProdotto();
     messaggioImmagine = L"Immagine non presente nel database.";
+    aggiornaRiepilogoProdotto();
 
     const int indice = indiceRecordSelezionato();
     if (indice >= 0 && indice < static_cast<int>(prodotti.size()) && gdiplusToken != 0)
@@ -563,6 +595,30 @@ void InterfacciaGrafica::aggiornaImmagineProdotto()
 
     if (pannelloImmagine != nullptr)
         InvalidateRect(pannelloImmagine, nullptr, TRUE);
+}
+
+void InterfacciaGrafica::aggiornaRiepilogoProdotto()
+{
+    if (riepilogoProdotto == nullptr) return;
+
+    const int indice = indiceRecordSelezionato();
+    if (indice < 0 || indice >= static_cast<int>(prodotti.size()))
+    {
+        SetWindowTextW(riepilogoProdotto, L"Selezionare un prodotto.");
+        return;
+    }
+
+    const Prodotto& prodotto = prodotti[indice];
+    const std::wstring trattamento = prodotto.getTrattamento().isAssegnato()
+        ? utf8ToWide(prodotto.getTrattamento().getTrattamento())
+        : L"Nessun trattamento";
+    const std::wstring riepilogo =
+        L"Descrizione: " + utf8ToWide(prodotto.getDescrizione()) + L"\r\n" +
+        L"Filato: " + std::to_wstring(prodotto.getFilato().getCodice()) + L" " +
+        utf8ToWide(prodotto.getFilato().getNome()) + L" - " +
+        utf8ToWide(prodotto.getFilato().getComposizione()) + L"\r\n" +
+        L"Trattamento: " + trattamento;
+    SetWindowTextW(riepilogoProdotto, riepilogo.c_str());
 }
 
 void InterfacciaGrafica::caricaImmagineSelezionata()
@@ -783,6 +839,7 @@ void InterfacciaGrafica::aggiornaVista(bool ricarica)
     case Sezione::Filati: mostraFilati(ricarica); break;
     case Sezione::Tecnici: mostraTecnici(ricarica); break;
     case Sezione::Fornitori: mostraFornitori(ricarica); break;
+    case Sezione::Trattamenti: mostraTrattamenti(ricarica); break;
     }
 }
 
@@ -830,6 +887,13 @@ void InterfacciaGrafica::nuovoRecord()
         riuscito = databaseManager->inserisciFornitore(Fornitore(wideToUtf8(campi[0].valore), wideToUtf8(campi[1].valore),
             wideToUtf8(campi[2].valore), wideToUtf8(campi[3].valore), wideToUtf8(campi[4].valore)));
     }
+    else if (sezioneCorrente == Sezione::Trattamenti)
+    {
+        std::vector<CampoRecord> campi = { {L"Trattamento"} };
+        if (!modulo.mostra(L"Nuovo trattamento", campi)) return;
+        if (!obbligatorio(finestra, campi[0].valore, L"Trattamento")) return;
+        riuscito = databaseManager->inserisciTrattamento(Trattamento(wideToUtf8(campi[0].valore)));
+    }
     else if (sezioneCorrente == Sezione::Filati)
     {
         const auto scelteFornitori = databaseManager->caricaFornitori();
@@ -848,6 +912,7 @@ void InterfacciaGrafica::nuovoRecord()
         const auto scelteFilati = databaseManager->caricaFilati();
         const auto scelteClienti = databaseManager->caricaClienti();
         const auto scelteTecnici = databaseManager->caricaTecnici();
+        const auto scelteTrattamenti = databaseManager->caricaTrattamenti();
         if (scelteFilati.empty() || scelteClienti.empty() || scelteTecnici.empty())
         {
             MessageBoxW(finestra, L"Per creare un prodotto servono filato, cliente e tecnico attivi.", L"Dati collegati mancanti", MB_OK | MB_ICONWARNING);
@@ -855,8 +920,10 @@ void InterfacciaGrafica::nuovoRecord()
         }
         std::vector<std::wstring> opzioniTecnici;
         for (const auto& t : scelteTecnici) opzioniTecnici.push_back(utf8ToWide(t.getCognome() + " " + t.getNome()));
+        std::vector<std::wstring> opzioniTrattamenti{ L"Nessun trattamento" };
+        for (const auto& t : scelteTrattamenti) opzioniTrattamenti.push_back(utf8ToWide(t.getTrattamento()));
         std::vector<CampoRecord> campi = { {L"Stagione", L"", {L"PE", L"AI"}}, {L"Anno"}, {L"Articolo"}, {L"Modello"},
-            {L"Descrizione"}, {L"Tecnico", L"", opzioniTecnici} };
+            {L"Descrizione"}, {L"Tecnico", L"", opzioniTecnici}, {L"Trattamento", L"", opzioniTrattamenti} };
         if (!modulo.mostra(L"Nuovo prodotto", campi)) return;
         int anno = 0, articolo = 0, modello = 0;
         if (!interoPositivo(finestra, campi[1].valore, L"Anno", anno) || !interoPositivo(finestra, campi[2].valore, L"Articolo", articolo) ||
@@ -888,6 +955,8 @@ void InterfacciaGrafica::nuovoRecord()
         }
         Prodotto prodotto(static_cast<short>(campi[0].indiceSelezionato + 1), anno, articolo, modello, wideToUtf8(campi[4].valore),
             scelteFilati[indiceFilato], scelteClienti[indiceCliente], scelteTecnici[campi[5].indiceSelezionato]);
+        if (campi[6].indiceSelezionato > 0)
+            prodotto.setTrattamento(scelteTrattamenti[campi[6].indiceSelezionato - 1]);
         riuscito = databaseManager->inserisciProdotto(prodotto);
     }
 
@@ -930,6 +999,15 @@ void InterfacciaGrafica::modificaRecord()
             wideToUtf8(campi[3].valore), wideToUtf8(campi[4].valore));
         riuscito = databaseManager->aggiornaFornitore(originale.getId_Fornitore(), aggiornato);
     }
+    else if (sezioneCorrente == Sezione::Trattamenti)
+    {
+        const Trattamento originale = trattamenti[indice];
+        std::vector<CampoRecord> campi = { {L"Trattamento", utf8ToWide(originale.getTrattamento())} };
+        if (!modulo.mostra(L"Modifica trattamento", campi)) return;
+        if (!obbligatorio(finestra, campi[0].valore, L"Trattamento")) return;
+        riuscito = databaseManager->aggiornaTrattamento(
+            originale.getId_Trattamento(), Trattamento(wideToUtf8(campi[0].valore)));
+    }
     else if (sezioneCorrente == Sezione::Filati)
     {
         const Filato originale = filati[indice];
@@ -951,13 +1029,25 @@ void InterfacciaGrafica::modificaRecord()
         const auto scelteFilati = databaseManager->caricaFilati();
         const auto scelteClienti = databaseManager->caricaClienti();
         const auto scelteTecnici = databaseManager->caricaTecnici();
+        const auto scelteTrattamenti = databaseManager->caricaTrattamenti();
         std::vector<std::wstring> opzioniTecnici;
         for (const auto& t : scelteTecnici) opzioniTecnici.push_back(utf8ToWide(t.getCognome() + " " + t.getNome()));
         const int iTecnico = trovaIndice(scelteTecnici, [&](const Tecnico& t) { return t.getCognome() == originale.getTecnico().getCognome() && t.getNome() == originale.getTecnico().getNome(); });
+        std::vector<std::wstring> opzioniTrattamenti{ L"Nessun trattamento" };
+        for (const auto& t : scelteTrattamenti) opzioniTrattamenti.push_back(utf8ToWide(t.getTrattamento()));
+        int iTrattamento = 0;
+        if (originale.getTrattamento().isAssegnato())
+        {
+            const int trovato = trovaIndice(scelteTrattamenti, [&](const Trattamento& t) {
+                return t.getId_Trattamento() == originale.getTrattamento().getId_Trattamento();
+                });
+            if (trovato >= 0) iTrattamento = trovato + 1;
+        }
         std::vector<CampoRecord> campi = { {L"Stagione", L"", {L"PE", L"AI"}, false, originale.getStagione() - 1},
             {L"Anno", std::to_wstring(originale.getAnno())}, {L"Articolo", std::to_wstring(originale.getArticolo())},
             {L"Modello", std::to_wstring(originale.getModello())}, {L"Descrizione", utf8ToWide(originale.getDescrizione())},
-            {L"Tecnico", L"", opzioniTecnici, false, iTecnico} };
+            {L"Tecnico", L"", opzioniTecnici, false, iTecnico},
+            {L"Trattamento", L"", opzioniTrattamenti, false, iTrattamento} };
         if (!modulo.mostra(L"Modifica prodotto", campi)) return;
         int anno = 0, articolo = 0, modello = 0;
         if (!interoPositivo(finestra, campi[1].valore, L"Anno", anno) || !interoPositivo(finestra, campi[2].valore, L"Articolo", articolo) ||
@@ -984,6 +1074,10 @@ void InterfacciaGrafica::modificaRecord()
         aggiornato.setAnno(anno); aggiornato.setArticolo(articolo); aggiornato.setModello(modello); aggiornato.setDescrizione(wideToUtf8(campi[4].valore));
         aggiornato.setFilato(scelteFilati[indiceFilato]); aggiornato.setCliente(scelteClienti[indiceCliente]);
         aggiornato.setTecnico(scelteTecnici[campi[5].indiceSelezionato]);
+        if (campi[6].indiceSelezionato > 0)
+            aggiornato.setTrattamento(scelteTrattamenti[campi[6].indiceSelezionato - 1]);
+        else
+            aggiornato.setTrattamento(Trattamento());
         riuscito = databaseManager->aggiornaProdotto(originale.getArticolo(), originale.getModello(), aggiornato);
     }
 
@@ -1004,6 +1098,7 @@ void InterfacciaGrafica::eliminaRecord()
     case Sezione::Filati: riuscito = databaseManager->eliminaFilato(filati[indice].getCodice()); break;
     case Sezione::Fornitori: riuscito = databaseManager->eliminaFornitore(fornitori[indice].getId_Fornitore()); break;
     case Sezione::Tecnici: riuscito = databaseManager->eliminaTecnico(tecnici[indice].getCognome(), tecnici[indice].getNome()); break;
+    case Sezione::Trattamenti: riuscito = databaseManager->eliminaTrattamento(trattamenti[indice].getId_Trattamento()); break;
     case Sezione::Prodotti: riuscito = databaseManager->eliminaProdotto(prodotti[indice].getArticolo(), prodotti[indice].getModello()); break;
     }
     if (!riuscito) { mostraErroreDatabase(L"Eliminazione"); return; }

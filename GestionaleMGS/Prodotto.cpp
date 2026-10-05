@@ -239,6 +239,11 @@ const Tecnico& Prodotto::getTecnico() const
     return tecnico;
 }
 
+const Trattamento& Prodotto::getTrattamento() const
+{
+    return trattamento;
+}
+
 //Metodi Set
 
 void Prodotto::setStagione(short newStagione) {
@@ -289,6 +294,11 @@ void Prodotto::setTecnico(const Tecnico& nuovoTecnico)
     tecnico = nuovoTecnico;
 }
 
+void Prodotto::setTrattamento(const Trattamento& nuovoTrattamento)
+{
+    trattamento = nuovoTrattamento;
+}
+
 //Metodi Stampa
 
 void Prodotto::stampaProdotto() {
@@ -320,6 +330,10 @@ void Prodotto::stampaRecordProdotto() {
 
     cout << "TECNICO => ";
     tecnico.stampaTecnico();
+
+    cout << "TRATTAMENTO => ";
+    trattamento.stampaTrattamento();
+    cout << endl;
 
     cout << "===============================" << endl;
 

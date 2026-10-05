@@ -13,6 +13,7 @@
 #include "Immagine.hpp"
 #include "Prodotto.hpp"
 #include "Tecnico.hpp"
+#include "Trattamento.hpp"
 
 class DatabaseManager
 {
@@ -39,6 +40,7 @@ public:
     const std::string& ultimoErrore() const;
     bool verificaSchema(std::vector<std::string>& problemi);
     bool preparaArchivioImmagini();
+    bool preparaArchivioTrattamenti();
 
     bool eseguiQuery(const std::string& query);
     std::unique_ptr<sql::ResultSet> eseguiSelect(const std::string& query);
@@ -47,6 +49,7 @@ public:
     std::vector<Filato> caricaFilati();
     std::vector<Fornitore> caricaFornitori();
     std::vector<Tecnico> caricaTecnici();
+    std::vector<Trattamento> caricaTrattamenti();
     std::vector<Prodotto> caricaProdotti();
 
     bool inserisciCliente(const Cliente& cliente);
@@ -67,6 +70,10 @@ public:
         const std::string& vecchioNome,
         const Tecnico& tecnico);
     bool eliminaTecnico(const std::string& cognome, const std::string& nome);
+
+    bool inserisciTrattamento(const Trattamento& trattamento);
+    bool aggiornaTrattamento(int idTrattamento, const Trattamento& trattamento);
+    bool eliminaTrattamento(int idTrattamento);
 
     bool inserisciProdotto(const Prodotto& prodotto);
     bool aggiornaProdotto(int vecchioArticolo, int vecchioModello, const Prodotto& prodotto);
