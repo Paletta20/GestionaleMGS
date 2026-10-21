@@ -561,7 +561,7 @@ void InterfacciaGrafica::aggiornaImmagineProdotto()
         std::string mimeType;
         std::vector<unsigned char> dati;
         if (databaseManager->caricaImmagineProdotto(
-            prodotti[indice].getArticolo(), prodotti[indice].getModello(), nomeFile, mimeType, dati) && !dati.empty())
+            prodotti[indice].getId_Prodotto(), nomeFile, mimeType, dati) && !dati.empty())
         {
             HGLOBAL memoria = GlobalAlloc(GMEM_MOVEABLE, dati.size());
             if (memoria != nullptr)
@@ -664,7 +664,7 @@ void InterfacciaGrafica::caricaImmagineSelezionata()
 
     const Prodotto& prodotto = prodotti[indice];
     if (!databaseManager->salvaImmagineProdotto(
-        prodotto.getArticolo(), prodotto.getModello(), wideToUtf8(percorso.filename().wstring()),
+        prodotto.getId_Prodotto(), wideToUtf8(percorso.filename().wstring()),
         mimeTypeDaEstensione(percorso.extension().wstring()), dati))
     {
         mostraErroreDatabase(L"Caricamento immagine");
@@ -1078,7 +1078,7 @@ void InterfacciaGrafica::modificaRecord()
             aggiornato.setTrattamento(scelteTrattamenti[campi[6].indiceSelezionato - 1]);
         else
             aggiornato.setTrattamento(Trattamento());
-        riuscito = databaseManager->aggiornaProdotto(originale.getArticolo(), originale.getModello(), aggiornato);
+        riuscito = databaseManager->aggiornaProdotto(originale.getId_Prodotto(), aggiornato);
     }
 
     if (!riuscito) { mostraErroreDatabase(L"Modifica"); return; }
@@ -1099,7 +1099,7 @@ void InterfacciaGrafica::eliminaRecord()
     case Sezione::Fornitori: riuscito = databaseManager->eliminaFornitore(fornitori[indice].getId_Fornitore()); break;
     case Sezione::Tecnici: riuscito = databaseManager->eliminaTecnico(tecnici[indice].getCognome(), tecnici[indice].getNome()); break;
     case Sezione::Trattamenti: riuscito = databaseManager->eliminaTrattamento(trattamenti[indice].getId_Trattamento()); break;
-    case Sezione::Prodotti: riuscito = databaseManager->eliminaProdotto(prodotti[indice].getArticolo(), prodotti[indice].getModello()); break;
+    case Sezione::Prodotti: riuscito = databaseManager->eliminaProdotto(prodotti[indice].getId_Prodotto()); break;
     }
     if (!riuscito) { mostraErroreDatabase(L"Eliminazione"); return; }
     aggiornaVista(true);

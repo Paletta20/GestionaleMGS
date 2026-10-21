@@ -7,7 +7,7 @@
 
 namespace
 {
-    std::string nomeImmagineNormalizzato(int articolo, int modello, const std::string& nomeOriginale)
+    std::string estensioneImmagine(const std::string& nomeOriginale)
     {
         std::string estensione;
         const std::size_t separatore = nomeOriginale.find_last_of("/\\");
@@ -18,7 +18,7 @@ namespace
             std::transform(estensione.begin(), estensione.end(), estensione.begin(),
                 [](unsigned char carattere) { return static_cast<char>(std::tolower(carattere)); });
         }
-        return std::to_string(articolo) + "-" + std::to_string(modello) + estensione;
+        return estensione;
     }
 
     short codiceStagioneToShort(const std::string& codice)
@@ -40,6 +40,76 @@ namespace
 
         return "AI";
     }
+    struct IndiceProdotti
+    {
+        std::string nome;
+        std::string colonne;
+    };
+
+    std::vector<IndiceProdotti> indiciUnivociProdotti(sql::Connection& connection)
+    {
+        std::unique_ptr<sql::Statement> statement(connection.createStatement());
+        std::unique_ptr<sql::ResultSet> result(statement->executeQuery(
+            "SELECT INDEX_NAME, GROUP_CONCAT(COALESCE(COLUMN_NAME, '<espressione>') "
+            "ORDER BY COLUMN_NAME SEPARATOR ',') AS colonne "
+            "FROM INFORMATION_SCHEMA.STATISTICS "
+            "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'prodotti' "
+            "AND NON_UNIQUE = 0 AND INDEX_NAME <> 'PRIMARY' "
+            "GROUP BY INDEX_NAME HAVING SUM(SUB_PART IS NOT NULL) = 0"));
+        std::vector<IndiceProdotti> indici;
+        while (result->next())
+            indici.push_back({ result->getString("INDEX_NAME"), result->getString("colonne") });
+        return indici;
+    }
+
+    // Quoting is needed even for index names read from database metadata.
+    std::string identificatoreSQL(const std::string& nome)
+    {
+        std::string risultato = "`";
+        for (char c : nome)
+        {
+            risultato += c;
+            if (c == '`') risultato += '`';
+        }
+        return risultato + "`";
+    }
+
+    bool identitaProdottiNonNull(sql::Connection& connection)
+    {
+        std::unique_ptr<sql::Statement> statement(connection.createStatement());
+        std::unique_ptr<sql::ResultSet> colonne(statement->executeQuery(
+            "SELECT COUNT(*) AS presenti FROM INFORMATION_SCHEMA.COLUMNS "
+            "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'prodotti' "
+            "AND COLUMN_NAME IN ('articolo', 'modello', 'anno', 'id_stagione') AND IS_NULLABLE = 'NO'"));
+        if (colonne->next() && colonne->getInt("presenti") == 4) return true;
+        colonne.reset();
+        std::unique_ptr<sql::ResultSet> vincolo(statement->executeQuery(
+            "SELECT cc.CHECK_CLAUSE FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc "
+            "INNER JOIN INFORMATION_SCHEMA.CHECK_CONSTRAINTS cc "
+            "ON cc.CONSTRAINT_SCHEMA = tc.CONSTRAINT_SCHEMA AND cc.CONSTRAINT_NAME = tc.CONSTRAINT_NAME "
+            "WHERE tc.CONSTRAINT_SCHEMA = DATABASE() AND tc.TABLE_NAME = 'prodotti' "
+            "AND tc.CONSTRAINT_NAME = 'chk_prodotti_identita_completa' AND tc.ENFORCED = 'YES'"));
+        if (!vincolo->next()) return false;
+        std::string clausola = vincolo->getString("CHECK_CLAUSE");
+        clausola.erase(std::remove_if(clausola.begin(), clausola.end(), [](unsigned char c) {
+            return std::isspace(c) || c == '`' || c == '(' || c == ')';
+        }), clausola.end());
+        std::transform(clausola.begin(), clausola.end(), clausola.begin(),
+            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        return clausola == "articoloisnotnullandmodelloisnotnullandannoisnotnullandid_stagioneisnotnull";
+    }
+
+    std::string erroreProdotto(const sql::SQLException& err)
+    {
+        if (err.getErrorCode() == 1062)
+            return "Esiste gia' un prodotto con la stessa combinazione articolo, modello, anno e stagione. "
+                "Scegliere una combinazione diversa.";
+        std::ostringstream messaggio;
+        messaggio << err.what() << " (codice: " << err.getErrorCode()
+            << ", stato SQL: " << err.getSQLState() << ")";
+        return messaggio.str();
+    }
+
 }
 
 DatabaseManager::DatabaseManager()
@@ -143,17 +213,21 @@ bool DatabaseManager::verificaSchema(std::vector<std::string>& problemi)
             }
         }
 
+        if (problemi.empty() && !verificaUnicitaProdotti())
+            problemi.push_back(ultimo_errore);
+
         if (problemi.empty())
         {
             std::unique_ptr<sql::Statement> statement(connection->createStatement());
             std::unique_ptr<sql::ResultSet> result(statement->executeQuery(
                 "SELECT COUNT(*) AS incoerenti FROM immagini i "
                 "INNER JOIN prodotti p ON p.id_immagine = i.id_immagine "
+                "INNER JOIN stagioni s ON s.id_stagione = p.id_stagione "
                 "WHERE i.dati_immagine IS NOT NULL "
-                "AND i.nome_file <> CONCAT(p.articolo, '-', p.modello) "
-                "AND i.nome_file NOT LIKE CONCAT(p.articolo, '-', p.modello, '.%')"));
+                "AND i.nome_file <> CONCAT(p.articolo, '-', p.modello, '-', p.anno, '-', s.codice) "
+                "AND i.nome_file NOT LIKE CONCAT(p.articolo, '-', p.modello, '-', p.anno, '-', s.codice, '.%')"));
             if (result->next() && result->getInt("incoerenti") > 0)
-                problemi.push_back("Sono presenti nomi immagine non coerenti con articolo-modello.");
+                problemi.push_back("Sono presenti nomi immagine non coerenti con articolo-modello-anno-stagione.");
         }
     }
     catch (const sql::SQLException& err)
@@ -166,6 +240,114 @@ bool DatabaseManager::verificaSchema(std::vector<std::string>& problemi)
         return false;
     }
     return problemi.empty();
+}
+
+bool DatabaseManager::verificaUnicitaProdotti()
+{
+    ultimo_errore.clear();
+    if (!isConnesso())
+    {
+        ultimo_errore = "Connessione DataBase non attiva.";
+        return false;
+    }
+    try
+    {
+        bool presente = false;
+        for (const auto& indice : indiciUnivociProdotti(*connection))
+        {
+            if (indice.colonne == "articolo,modello")
+            {
+                ultimo_errore = "E' ancora presente un vincolo univoco sulla sola coppia articolo-modello.";
+                return false;
+            }
+            if (indice.colonne == "anno,articolo,id_stagione,modello") presente = true;
+        }
+        if (!presente || !identitaProdottiNonNull(*connection))
+        {
+            ultimo_errore = "Manca il vincolo UNIQUE completo su articolo, modello, anno e stagione "
+                "oppure e' consentita un'identita' incompleta.";
+            return false;
+        }
+        return true;
+    }
+    catch (const sql::SQLException& err)
+    {
+        ultimo_errore = err.what();
+        return false;
+    }
+}
+
+bool DatabaseManager::preparaArchivioProdotti()
+{
+    ultimo_errore.clear();
+    if (!isConnesso())
+    {
+        ultimo_errore = "Connessione DataBase non attiva.";
+        return false;
+    }
+    try
+    {
+        std::unique_ptr<sql::Statement> statement(connection->createStatement());
+        // No automatic merging or deletion: inconsistent archives need explicit correction.
+        std::unique_ptr<sql::ResultSet> incompleti(statement->executeQuery(
+            "SELECT COUNT(*) AS presenti FROM prodotti WHERE articolo IS NULL OR modello IS NULL "
+            "OR anno IS NULL OR id_stagione IS NULL"));
+        if (incompleti->next() && incompleti->getInt("presenti") != 0)
+        {
+            ultimo_errore = "Migrazione interrotta: esistono prodotti con articolo, modello, anno o stagione NULL. "
+                "Correggere i dati prima di riavviare. Nessun prodotto e' stato eliminato.";
+            return false;
+        }
+        incompleti.reset();
+        std::unique_ptr<sql::ResultSet> duplicati(statement->executeQuery(
+            "SELECT articolo, modello, anno, id_stagione, COUNT(*) AS quanti FROM prodotti "
+            "GROUP BY articolo, modello, anno, id_stagione HAVING COUNT(*) > 1 LIMIT 1"));
+        if (duplicati->next())
+        {
+            std::ostringstream errore;
+            errore << "Migrazione interrotta: " << duplicati->getInt("quanti")
+                << " prodotti duplicati per articolo " << duplicati->getInt("articolo")
+                << ", modello " << duplicati->getInt("modello") << ", anno " << duplicati->getInt("anno")
+                << ", id stagione " << duplicati->getInt("id_stagione")
+                << ". Correggere i duplicati prima di riavviare. Nessun prodotto e' stato eliminato.";
+            ultimo_errore = errore.str();
+            return false;
+        }
+        duplicati.reset();
+
+        const auto indici = indiciUnivociProdotti(*connection);
+        std::vector<std::string> modifiche;
+        bool presente = false;
+        for (const auto& indice : indici)
+        {
+            if (indice.colonne == "anno,articolo,id_stagione,modello") presente = true;
+            if (indice.colonne == "articolo,modello")
+                modifiche.push_back("DROP INDEX " + identificatoreSQL(indice.nome));
+        }
+        if (!presente)
+            modifiche.push_back("ADD CONSTRAINT uq_prodotti_collezione UNIQUE (articolo, modello, anno, id_stagione)");
+        if (!identitaProdottiNonNull(*connection))
+            modifiche.push_back("ADD CONSTRAINT chk_prodotti_identita_completa CHECK "
+                "(articolo IS NOT NULL AND modello IS NOT NULL AND anno IS NOT NULL AND id_stagione IS NOT NULL)");
+        if (!modifiche.empty())
+        {
+            // One atomic ALTER: never remove the old index before creating the new one.
+            std::string query = "ALTER TABLE prodotti ";
+            for (std::size_t i = 0; i < modifiche.size(); ++i)
+            {
+                if (i != 0) query += ", ";
+                query += modifiche[i];
+            }
+            statement->execute(query);
+        }
+        return verificaUnicitaProdotti();
+    }
+    catch (const sql::SQLException& err)
+    {
+        ultimo_errore = "Impossibile applicare l'unicita' dei prodotti: " + std::string(err.what()) +
+            ". Verificare lo schema e i privilegi ALTER dell'utente database.";
+        return false;
+    }
 }
 
 bool DatabaseManager::preparaArchivioImmagini()
@@ -204,10 +386,11 @@ bool DatabaseManager::preparaArchivioImmagini()
         normalizza->executeUpdate(
             "UPDATE immagini i "
             "INNER JOIN prodotti p ON p.id_immagine = i.id_immagine "
-            "SET i.nome_file = CONCAT(p.articolo, '-', p.modello, "
+            "INNER JOIN stagioni s ON s.id_stagione = p.id_stagione "
+            "SET i.nome_file = CONCAT(p.articolo, '-', p.modello, '-', p.anno, '-', s.codice, "
             "CASE WHEN i.nome_file IS NOT NULL AND INSTR(i.nome_file, '.') > 0 "
             "THEN CONCAT('.', LOWER(SUBSTRING_INDEX(i.nome_file, '.', -1))) ELSE '' END), "
-            "i.percorso_file = CONCAT('database://', p.articolo, '-', p.modello, "
+            "i.percorso_file = CONCAT('database://', p.articolo, '-', p.modello, '-', p.anno, '-', s.codice, "
             "CASE WHEN i.nome_file IS NOT NULL AND INSTR(i.nome_file, '.') > 0 "
             "THEN CONCAT('.', LOWER(SUBSTRING_INDEX(i.nome_file, '.', -1))) ELSE '' END) "
             "WHERE i.dati_immagine IS NOT NULL");
@@ -1055,6 +1238,13 @@ bool DatabaseManager::inserisciProdotto(const Prodotto& prodotto)
         return false;
     }
 
+    if (prodotto.getAnno() < 1900 || prodotto.getAnno() > 2100 ||
+        (prodotto.getStagione() != 1 && prodotto.getStagione() != 2))
+    {
+        ultimo_errore = "Anno o stagione non validi: anno tra 1900 e 2100, stagione PE o AI.";
+        return false;
+    }
+
     if (!prodotto.haCodiciRelazionaliCoerenti())
     {
         ultimo_errore = "Codici prodotto non coerenti: le prime tre cifre dell'articolo devono "
@@ -1156,22 +1346,25 @@ bool DatabaseManager::inserisciProdotto(const Prodotto& prodotto)
         {
         }
 
-        std::ostringstream messaggio;
-        messaggio << err.what()
-            << " (codice: " << err.getErrorCode()
-            << ", stato SQL: " << err.getSQLState() << ")";
-        ultimo_errore = messaggio.str();
+        ultimo_errore = erroreProdotto(err);
         return false;
     }
 }
 
-bool DatabaseManager::aggiornaProdotto(int vecchioArticolo, int vecchioModello, const Prodotto& prodotto)
+bool DatabaseManager::aggiornaProdotto(int idProdotto, const Prodotto& prodotto)
 {
     ultimo_errore.clear();
 
     if (!isConnesso())
     {
         ultimo_errore = "Connessione DataBase non attiva.";
+        return false;
+    }
+
+    if (prodotto.getAnno() < 1900 || prodotto.getAnno() > 2100 ||
+        (prodotto.getStagione() != 1 && prodotto.getStagione() != 2))
+    {
+        ultimo_errore = "Anno o stagione non validi: anno tra 1900 e 2100, stagione PE o AI.";
         return false;
     }
 
@@ -1184,6 +1377,32 @@ bool DatabaseManager::aggiornaProdotto(int vecchioArticolo, int vecchioModello, 
 
     try
     {
+        connection->setAutoCommit(false);
+        // Lock the target and its new references before updating. A successful
+        // no-op save must not be mistaken for a missing record or invalid links.
+        std::unique_ptr<sql::PreparedStatement> verifica(connection->prepareStatement(
+            "SELECT p.id_prodotto FROM prodotti p "
+            "INNER JOIN filati fi ON fi.codice = ? AND fi.attivo = 1 "
+            "INNER JOIN clienti c ON c.serie = ? AND c.attivo = 1 "
+            "INNER JOIN tecnici t ON t.cognome = ? AND t.nome = ? AND t.attivo = 1 "
+            "INNER JOIN stagioni s ON s.codice = ? "
+            "WHERE p.id_prodotto = ? FOR UPDATE"));
+        verifica->setInt(1, prodotto.getFilato().getCodice());
+        verifica->setInt(2, prodotto.getCliente().getSerie());
+        verifica->setString(3, prodotto.getTecnico().getCognome());
+        verifica->setString(4, prodotto.getTecnico().getNome());
+        verifica->setString(5, shortToCodiceStagione(prodotto.getStagione()));
+        verifica->setInt(6, idProdotto);
+        std::unique_ptr<sql::ResultSet> esistente(verifica->executeQuery());
+        if (!esistente->next())
+        {
+            ultimo_errore = "Prodotto non trovato oppure filato, cliente, tecnico o stagione non disponibili.";
+            connection->rollback();
+            connection->setAutoCommit(true);
+            return false;
+        }
+        esistente.reset();
+
         std::unique_ptr<sql::PreparedStatement> statement(
             connection->prepareStatement(
                 "UPDATE prodotti p "
@@ -1195,8 +1414,14 @@ bool DatabaseManager::aggiornaProdotto(int vecchioArticolo, int vecchioModello, 
                 "SET p.articolo = ?, p.modello = ?, p.anno = ?, p.descrizione = ?, "
                 "p.id_filato = fi.id_filato, p.id_cliente = c.id_cliente, "
                 "p.id_tecnico = t.id_tecnico, p.id_stagione = s.id_stagione, "
-                "p.id_trattamento = NULLIF(?, 0), i.percorso_file = ?, i.descrizione = ? "
-                "WHERE p.articolo = ? AND p.modello = ?"));
+                "p.id_trattamento = NULLIF(?, 0), "
+                "i.percorso_file = CONCAT('database://', ?, "
+                "CASE WHEN INSTR(i.nome_file, '.') > 0 THEN CONCAT('.', LOWER(SUBSTRING_INDEX(i.nome_file, '.', -1))) ELSE '' END), "
+                "i.nome_file = CASE WHEN i.nome_file IS NULL THEN NULL ELSE "
+                "CONCAT(?, "
+                "CASE WHEN INSTR(i.nome_file, '.') > 0 THEN CONCAT('.', LOWER(SUBSTRING_INDEX(i.nome_file, '.', -1))) ELSE '' END) END, "
+                "i.descrizione = ? "
+                "WHERE p.id_prodotto = ?"));
         statement->setInt(1, prodotto.getFilato().getCodice());
         statement->setInt(2, prodotto.getCliente().getSerie());
         statement->setString(3, prodotto.getTecnico().getCognome());
@@ -1207,23 +1432,33 @@ bool DatabaseManager::aggiornaProdotto(int vecchioArticolo, int vecchioModello, 
         statement->setInt(8, prodotto.getAnno());
         statement->setString(9, prodotto.getDescrizione());
         statement->setInt(10, prodotto.getTrattamento().getId_Trattamento());
-        statement->setString(11, prodotto.getImmagine().getPercorsoFile());
-        statement->setString(12, prodotto.getImmagine().getDescrizione());
-        statement->setInt(13, vecchioArticolo);
-        statement->setInt(14, vecchioModello);
-        return statement->executeUpdate() > 0;
+        const std::string nomeBase = std::to_string(prodotto.getArticolo()) + "-" +
+            std::to_string(prodotto.getModello()) + "-" + std::to_string(prodotto.getAnno()) + "-" +
+            shortToCodiceStagione(prodotto.getStagione());
+        statement->setString(11, nomeBase);
+        statement->setString(12, nomeBase);
+        statement->setString(13, prodotto.getImmagine().getDescrizione());
+        statement->setInt(14, idProdotto);
+        statement->executeUpdate();
+        connection->commit();
+        connection->setAutoCommit(true);
+        return true;
     }
     catch (const sql::SQLException& err)
     {
-        std::ostringstream messaggio;
-        messaggio << err.what()
-            << " (codice: " << err.getErrorCode()
-            << ", stato SQL: " << err.getSQLState() << ")";
-        ultimo_errore = messaggio.str();
+        try
+        {
+            connection->rollback();
+            connection->setAutoCommit(true);
+        }
+        catch (...)
+        {
+        }
+        ultimo_errore = erroreProdotto(err);
         return false;
     }
 }
-bool DatabaseManager::eliminaProdotto(int articolo, int modello)
+bool DatabaseManager::eliminaProdotto(int idProdotto)
 {
     ultimo_errore.clear();
 
@@ -1239,9 +1474,8 @@ bool DatabaseManager::eliminaProdotto(int articolo, int modello)
 
         std::unique_ptr<sql::PreparedStatement> cercaImmagine(
             connection->prepareStatement(
-                "SELECT id_immagine FROM prodotti WHERE articolo = ? AND modello = ?"));
-        cercaImmagine->setInt(1, articolo);
-        cercaImmagine->setInt(2, modello);
+                "SELECT id_immagine FROM prodotti WHERE id_prodotto = ? FOR UPDATE"));
+        cercaImmagine->setInt(1, idProdotto);
 
         std::unique_ptr<sql::ResultSet> immagineResult(cercaImmagine->executeQuery());
         if (!immagineResult->next())
@@ -1254,9 +1488,8 @@ bool DatabaseManager::eliminaProdotto(int articolo, int modello)
         int idImmagine = immagineResult->getInt("id_immagine");
 
         std::unique_ptr<sql::PreparedStatement> eliminaProdotto(
-            connection->prepareStatement("DELETE FROM prodotti WHERE articolo = ? AND modello = ?"));
-        eliminaProdotto->setInt(1, articolo);
-        eliminaProdotto->setInt(2, modello);
+            connection->prepareStatement("DELETE FROM prodotti WHERE id_prodotto = ?"));
+        eliminaProdotto->setInt(1, idProdotto);
 
         if (eliminaProdotto->executeUpdate() == 0)
         {
@@ -1298,8 +1531,7 @@ bool DatabaseManager::eliminaProdotto(int articolo, int modello)
 }
 
 bool DatabaseManager::salvaImmagineProdotto(
-    int articolo,
-    int modello,
+    int idProdotto,
     const std::string& nomeFile,
     const std::string& mimeType,
     const std::vector<unsigned char>& dati)
@@ -1318,22 +1550,24 @@ bool DatabaseManager::salvaImmagineProdotto(
 
     try
     {
-        const std::string nomeArchivio = nomeImmagineNormalizzato(articolo, modello, nomeFile);
+        const std::string estensione = estensioneImmagine(nomeFile);
         const std::string contenuto(reinterpret_cast<const char*>(dati.data()), dati.size());
         std::istringstream flusso(contenuto);
         std::unique_ptr<sql::PreparedStatement> statement(
             connection->prepareStatement(
                 "UPDATE immagini i "
                 "INNER JOIN prodotti p ON p.id_immagine = i.id_immagine "
-                "SET i.nome_file = ?, i.mime_type = ?, i.dati_immagine = ?, "
-                "i.percorso_file = ?, i.data_caricamento = NOW(6) "
-                "WHERE p.articolo = ? AND p.modello = ?"));
-        statement->setString(1, nomeArchivio);
+                "INNER JOIN stagioni s ON s.id_stagione = p.id_stagione "
+                "SET i.nome_file = CONCAT(p.articolo, '-', p.modello, '-', p.anno, '-', s.codice, ?), "
+                "i.mime_type = ?, i.dati_immagine = ?, "
+                "i.percorso_file = CONCAT('database://', p.articolo, '-', p.modello, '-', p.anno, '-', s.codice, ?), "
+                "i.data_caricamento = NOW(6) "
+                "WHERE p.id_prodotto = ?"));
+        statement->setString(1, estensione);
         statement->setString(2, mimeType);
         statement->setBlob(3, &flusso);
-        statement->setString(4, "database://" + nomeArchivio);
-        statement->setInt(5, articolo);
-        statement->setInt(6, modello);
+        statement->setString(4, estensione);
+        statement->setInt(5, idProdotto);
         if (statement->executeUpdate() == 0)
         {
             ultimo_errore = "Prodotto o record immagine associato non trovato.";
@@ -1352,8 +1586,7 @@ bool DatabaseManager::salvaImmagineProdotto(
 }
 
 bool DatabaseManager::caricaImmagineProdotto(
-    int articolo,
-    int modello,
+    int idProdotto,
     std::string& nomeFile,
     std::string& mimeType,
     std::vector<unsigned char>& dati)
@@ -1374,9 +1607,8 @@ bool DatabaseManager::caricaImmagineProdotto(
             connection->prepareStatement(
                 "SELECT i.nome_file, i.mime_type, i.dati_immagine "
                 "FROM prodotti p INNER JOIN immagini i ON i.id_immagine = p.id_immagine "
-                "WHERE p.articolo = ? AND p.modello = ?"));
-        statement->setInt(1, articolo);
-        statement->setInt(2, modello);
+                "WHERE p.id_prodotto = ?"));
+        statement->setInt(1, idProdotto);
         std::unique_ptr<sql::ResultSet> result(statement->executeQuery());
         if (!result->next())
         {

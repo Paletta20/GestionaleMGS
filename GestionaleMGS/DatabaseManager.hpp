@@ -39,6 +39,8 @@ public:
     bool isConnesso() const;
     const std::string& ultimoErrore() const;
     bool verificaSchema(std::vector<std::string>& problemi);
+    bool preparaArchivioProdotti();
+    bool verificaUnicitaProdotti();
     bool preparaArchivioImmagini();
     bool preparaArchivioTrattamenti();
 
@@ -76,17 +78,15 @@ public:
     bool eliminaTrattamento(int idTrattamento);
 
     bool inserisciProdotto(const Prodotto& prodotto);
-    bool aggiornaProdotto(int vecchioArticolo, int vecchioModello, const Prodotto& prodotto);
-    bool eliminaProdotto(int articolo, int modello);
+    bool aggiornaProdotto(int idProdotto, const Prodotto& prodotto);
+    bool eliminaProdotto(int idProdotto);
     bool salvaImmagineProdotto(
-        int articolo,
-        int modello,
+        int idProdotto,
         const std::string& nomeFile,
         const std::string& mimeType,
         const std::vector<unsigned char>& dati);
     bool caricaImmagineProdotto(
-        int articolo,
-        int modello,
+        int idProdotto,
         std::string& nomeFile,
         std::string& mimeType,
         std::vector<unsigned char>& dati);

@@ -19,10 +19,10 @@ namespace
     const string PERCORSO_IMMAGINI_PRODOTTI_TEMPORANEO = "C:/GestionaleMGS/ImmaginiProdotti/";
 }
 
-string Prodotto::generaPathImmagine(int articolo, int modello)
+string Prodotto::generaPathImmagine(int articolo, int modello, int anno, short stagione)
 {
     ostringstream path;
-    path << PERCORSO_IMMAGINI_PRODOTTI_TEMPORANEO << articolo << "-" << modello;
+    path << PERCORSO_IMMAGINI_PRODOTTI_TEMPORANEO << articolo << "-" << modello << "-" << anno << "-" << (stagione == 1 ? "PE" : "AI");
     return path.str();
 }
 
@@ -46,7 +46,7 @@ bool Prodotto::haCodiciRelazionaliCoerenti() const
 
 void Prodotto::aggiornaPathImmagineAutomatico()
 {
-    immagine.setPercorsoFile(generaPathImmagine(articolo, modello));
+    immagine.setPercorsoFile(generaPathImmagine(articolo, modello, anno, stagione));
 }
 
 Prodotto::Prodotto(int id_prodotto,
@@ -65,7 +65,7 @@ Prodotto::Prodotto(int id_prodotto,
     articolo(articolo),
     modello(modello),
     descrizione(descrizione),
-    immagine(pathImmagine.empty() ? generaPathImmagine(articolo, modello) : pathImmagine, descrizione),
+    immagine(pathImmagine.empty() ? generaPathImmagine(articolo, modello, anno, stagione) : pathImmagine, descrizione),
     filato(filato),
     cliente(cliente),
     tecnico(tecnico)
@@ -115,7 +115,7 @@ Prodotto::Prodotto(short stagione,
     articolo(articolo),
     modello(modello),
     descrizione(descrizione),
-    immagine(pathImmagine.empty() ? generaPathImmagine(articolo, modello) : pathImmagine, descrizione),
+    immagine(pathImmagine.empty() ? generaPathImmagine(articolo, modello, anno, stagione) : pathImmagine, descrizione),
     filato(filato),
     cliente(cliente),
     tecnico(tecnico)
@@ -161,7 +161,7 @@ Prodotto::Prodotto(int id_prodotto,
         articolo,
         modello,
         descrizione,
-        generaPathImmagine(articolo, modello),
+        generaPathImmagine(articolo, modello, anno, stagione),
         filato,
         cliente,
         tecnico)
@@ -182,7 +182,7 @@ Prodotto::Prodotto(short stagione,
         articolo,
         modello,
         descrizione,
-        generaPathImmagine(articolo, modello),
+        generaPathImmagine(articolo, modello, anno, stagione),
         filato,
         cliente,
         tecnico)
@@ -248,10 +248,12 @@ const Trattamento& Prodotto::getTrattamento() const
 
 void Prodotto::setStagione(short newStagione) {
     stagione = newStagione;
+    aggiornaPathImmagineAutomatico();
 }
 
 void Prodotto::setAnno(int newAnno) {
     anno = newAnno;
+    aggiornaPathImmagineAutomatico();
 }
 
 void Prodotto::setArticolo(int newArticolo) {

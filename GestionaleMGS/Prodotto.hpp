@@ -20,7 +20,7 @@ using namespace std;
 class Prodotto {
 
 private:
-    int id_prodotto;
+    int id_prodotto = 0;
     short stagione;
     int anno;
     int articolo;
@@ -32,7 +32,7 @@ private:
     Tecnico tecnico;
     Trattamento trattamento;
 
-    static string generaPathImmagine(int articolo, int modello);
+    static string generaPathImmagine(int articolo, int modello, int anno, short stagione);
     void aggiornaPathImmagineAutomatico();
 
 

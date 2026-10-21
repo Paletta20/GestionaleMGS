@@ -59,6 +59,14 @@ int main(int argc, char* argv[])
         return 1;
     }
 
+    if (!mysql.preparaArchivioProdotti())
+    {
+        const std::string errore = "Preparazione unicita' prodotti non riuscita: " + mysql.ultimoErrore();
+        std::cerr << errore << std::endl;
+        MessageBoxA(nullptr, errore.c_str(), "Gestionale MGS", MB_OK | MB_ICONERROR);
+        return 1;
+    }
+
     if (!mysql.preparaArchivioImmagini())
     {
         const std::string errore = "Preparazione archivio immagini non riuscita: " + mysql.ultimoErrore();

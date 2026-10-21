@@ -239,10 +239,11 @@ namespace
         return nullptr;
     }
 
-    Prodotto* trovaProdotto(vector<Prodotto>& prodotti, int articolo, int modello)
+    Prodotto* trovaProdotto(vector<Prodotto>& prodotti, int articolo, int modello, int anno, int stagione)
     {
         for (Prodotto& prodotto : prodotti)
-            if (prodotto.getArticolo() == articolo && prodotto.getModello() == modello)
+            if (prodotto.getArticolo() == articolo && prodotto.getModello() == modello &&
+                prodotto.getAnno() == anno && prodotto.getStagione() == stagione)
                 return &prodotto;
         return nullptr;
     }
@@ -687,13 +688,23 @@ void Menu::inserisciNewProdotto()
 }
 
 void Menu::cercaProdotto() {
-    int articolo = 0, modello = 0;
+    int articolo = 0, modello = 0, anno = 0, stagione = 0;
 
     cout << "Inserisci ARTICOLO " << endl;
     articolo = leggiScelta();
 
     cout << "Inserisci MODELLO " << endl;
     modello = leggiScelta();
+
+    cout << "Inserisci ANNO: ";
+    anno = leggiScelta();
+    cout << "Inserisci STAGIONE (PE = 1 / AI = 2): ";
+    stagione = leggiScelta();
+    if (anno < 1900 || anno > 2100 || (stagione != 1 && stagione != 2))
+    {
+        cout << "Anno o stagione non validi." << endl;
+        return;
+    }
 
     vector<Prodotto> prodotti = databaseManager->caricaProdotti();
     if (!databaseManager->ultimoErrore().empty())
@@ -702,7 +713,7 @@ void Menu::cercaProdotto() {
         return;
     }
 
-    Prodotto* p = trovaProdotto(prodotti, articolo, modello);
+    Prodotto* p = trovaProdotto(prodotti, articolo, modello, anno, stagione);
 
     if (p == nullptr)
     {
@@ -715,13 +726,23 @@ void Menu::cercaProdotto() {
 }
 
 void Menu::modificaProdotto() {
-    int articolo = 0, modello = 0;
+    int articolo = 0, modello = 0, anno = 0, stagione = 0;
 
     cout << "Inserisci ARTICOLO: " << endl;
     articolo = leggiScelta();
 
     cout << "Inserisci MODELLO: " << endl;
     modello = leggiScelta();
+
+    cout << "Inserisci ANNO: ";
+    anno = leggiScelta();
+    cout << "Inserisci STAGIONE (PE = 1 / AI = 2): ";
+    stagione = leggiScelta();
+    if (anno < 1900 || anno > 2100 || (stagione != 1 && stagione != 2))
+    {
+        cout << "Anno o stagione non validi." << endl;
+        return;
+    }
 
     vector<Prodotto> prodotti = databaseManager->caricaProdotti();
     if (!databaseManager->ultimoErrore().empty())
@@ -730,7 +751,7 @@ void Menu::modificaProdotto() {
         return;
     }
 
-    Prodotto* prodotto = trovaProdotto(prodotti, articolo, modello);
+    Prodotto* prodotto = trovaProdotto(prodotti, articolo, modello, anno, stagione);
 
     if (prodotto == nullptr)
     {
@@ -738,8 +759,7 @@ void Menu::modificaProdotto() {
         return;
     }
 
-    int vecchioArticolo = articolo;
-    int vecchioModello = modello;
+    const int idProdotto = prodotto->getId_Prodotto();
 
     cout << "\nProdotto trovato:\n";
     prodotto->stampaProdotto();
@@ -934,7 +954,7 @@ void Menu::modificaProdotto() {
         }
 
         case 0:
-            if (!databaseManager->aggiornaProdotto(vecchioArticolo, vecchioModello, *prodotto))
+            if (!databaseManager->aggiornaProdotto(idProdotto, *prodotto))
             {
                 cout << "Errore aggiornamento prodotto su MySQL: "
                     << databaseManager->ultimoErrore() << endl;
@@ -958,7 +978,7 @@ void Menu::modificaProdotto() {
 
 void Menu::eliminaProdotto()
 {
-    int articolo = 0, modello = 0;
+    int articolo = 0, modello = 0, anno = 0, stagione = 0;
 
     cout << "\n===== ELIMINA PRODOTTO =====\n";
 
@@ -968,6 +988,16 @@ void Menu::eliminaProdotto()
     cout << "Inserisci MODELLO del prodotto da eliminare: ";
     modello = leggiScelta();
 
+    cout << "Inserisci ANNO: ";
+    anno = leggiScelta();
+    cout << "Inserisci STAGIONE (PE = 1 / AI = 2): ";
+    stagione = leggiScelta();
+    if (anno < 1900 || anno > 2100 || (stagione != 1 && stagione != 2))
+    {
+        cout << "Anno o stagione non validi." << endl;
+        return;
+    }
+
     vector<Prodotto> prodotti = databaseManager->caricaProdotti();
     if (!databaseManager->ultimoErrore().empty())
     {
@@ -975,7 +1005,7 @@ void Menu::eliminaProdotto()
         return;
     }
 
-    Prodotto* prodotto = trovaProdotto(prodotti, articolo, modello);
+    Prodotto* prodotto = trovaProdotto(prodotti, articolo, modello, anno, stagione);
 
     if (prodotto == nullptr)
     {
@@ -1007,7 +1037,7 @@ void Menu::eliminaProdotto()
         return;
     }
 
-    if (!databaseManager->eliminaProdotto(articolo, modello))
+    if (!databaseManager->eliminaProdotto(prodotto->getId_Prodotto()))
     {
         cout << "Errore eliminazione prodotto su MySQL: "
             << databaseManager->ultimoErrore() << endl << endl;
