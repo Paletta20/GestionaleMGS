@@ -33,10 +33,9 @@ Applicazione desktop C++ per la gestione dei dati di un maglificio. Il programma
 
 ## Configurazione del database
 
-Le credenziali non sono incluse nel repository. Copiare `database.conf.example` in uno dei seguenti percorsi e sostituire i segnaposto:
+Le credenziali sono incluse nel repository:
 
-1. `%APPDATA%\GestionaleMGS\database.conf`;
-2. `database.conf` nella stessa cartella dell'eseguibile.
+`database.conf` nella stessa cartella dell'eseguibile.
 
 In alternativa sono supportate le variabili d'ambiente:
 
